@@ -31,3 +31,29 @@ Choices made while building the game where the rulebook, `readings.md` and `ruli
 - **Returning a card "to your hand"** puts it in the named player's hand, and that player becomes its owner.
 - **Order when a card is played:** (1) its combo enter (including Patience); (2) the player's character "when you play" ability; (3) other cards that watch for plays: Mantis Straight, Ink Roundhouse, Umbra Straight, then the opponent's Mantis Uppercut. "When you play" abilities also fire for cards played from the discard or deck, but not for cards that are only *put* into a combo.
 - **Copying a combo-enter ability** (Cyber Chop, Forest Finisher): "this card" in the copied text means the copying card. Copy effects can't copy each other (prevents loops).
+
+## Card-level choices (beyond readings.md)
+- **Flipping** only means face up → face down. Cards turned face up (Flash Cross, Lion Roundhouse, Death Snap, Evelyn) trigger nothing.
+- **Flash Jab** is offered on every flip of one of your combo cards except flips you chose yourself (Patience, River Roundhouse, Death Straight). **Life Jab** is offered only on flips caused by the opponent. **Mantis Jab** is offered only when the opponent's effect discards one of your combo cards.
+- **Sun Cross** (ruling): offered whenever you discard another card (from hand, combo or deck top), if that card is still in your discard pile. The Sun Cross's own discard doesn't trigger another Sun Cross.
+- **Lion Hook / Lion Finisher / Sun Cross** count discards where *you* are the one discarding: engage, reset, your own effects, and effects that tell you to discard (e.g. Dante makes the opponent discard from their own deck). Discards done *to* you by the opponent's effect (Sun Roundhouse) count for the opponent.
+- **Umbra Straight** / **Ink Roundhouse** / **Mantis Straight** don't trigger on themselves being played. **Mantis Uppercut** fires when the opponent plays a card with printed value 4 or less.
+- **Values in text** ("next to a 3", "a 5 or less") use the card's current value: face-down = 0, or 2 with Noct Umbra, +3 per Death Finisher. Numbers a character checks when a card is played ("odd number", "Red number less than 4") use the printed number.
+- **"The first card"** = leftmost; **"the last card"** = rightmost.
+- **Planting cards** (Umbra Chop, Ink Straight, Death Cross, Death Uppercut) may use any card from your discard pile, face up or face down. It goes into the opponent's combo face up, and at cleanup it returns to your discard pile.
+- **Flame Straight**: only face-up discard cards can be chosen. Choosing none is allowed.
+- **Phoenix Uppercut**: the opponent sees the damage amount, then picks which cards to discard.
+- **Flame Snap** with Flame Uppercut: the "lose all but 1 life" becomes a life *gain* of the same amount.
+- **Check Finisher**: four separate flips, each of any face-up card in either combo (yours included).
+- **Forest Hook**: with only 1 card left in the deck, that card is played. Nothing is discarded.
+- **Life Hook**: the "card next to it" is its left neighbor (it's always rightmost when it enters). With no neighbor, nothing happens.
+- **Life Uppercut**: true when your lowest combo value is greater than the opponent's highest (always true if their combo is empty).
+- **Life Snap**: random discards use the seeded generator. The player whose hand it is counts as the discarder.
+- **Death Roundhouse**: pick 1s one at a time (each must be a new color) or stop. They're played in the order picked.
+- **Ink Finisher**: its combo enter discards it. Its end-of-clash "stay" only matters if it's in a combo without having resolved combo enter (planted, put there by Leo Wildheart, or blocked by Ink Uppercut).
+- **River Roundhouse**: if the flip is prevented (Umbra Roundhouse, Life Jab, Flash Jab), the card isn't kept.
+- **Evelyn Shadow**: the start-of-clash reveal hits both combos. Revealed cards count their printed number but have no abilities (shown as "no abilities") until cleanup.
+- **Leo Wildheart**: the deck card is put in face up with no combo enter, as readings.md says. The even-number return is optional.
+- **Jack Spades**: a pair is the played card with the same value as the card directly to its left.
+- **Dante**: at 5 colors, both the 3-color and 5-color effects happen.
+- **Flash Finisher**: the whole discard pile, including Flash Finisher itself, is shuffled into the deck.
