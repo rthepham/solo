@@ -734,6 +734,12 @@
         log(s, `[debug] removed ${label(s, c)}.`);
         return;
       }
+      case 'clear': {
+        if (!['hand', 'combo', 'discard', 'deck'].includes(a.zone)) throw new Illegal('Unknown zone.');
+        P(s, p)[a.zone] = [];
+        log(s, `[debug] cleared ${pname(p)}'s ${a.zone}.`);
+        return;
+      }
       case 'turn': {
         if (s.phase !== 'action') throw new Illegal('Not in the action phase.');
         s.turn = p; s.lastAction = null;

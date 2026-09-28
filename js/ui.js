@@ -177,7 +177,9 @@
       <div class="row"><select id="dbgChar">${chars}</select><button data-dbg="character">Set character</button></div>
       <div class="row"><select id="dbgStat"><option>life</option><option>energy</option><option>power</option><option>maxEnergy</option></select>
         <input id="dbgVal" type="number" value="10" style="width:70px"><button data-dbg="set">Set</button></div>
+      <div class="row"><select id="dbgClearZone"><option value="hand">hand</option><option value="combo">combo</option><option value="discard">discard</option><option value="deck">deck</option></select><button data-dbg="clear">Clear zone</button></div>
       <div class="row"><button data-dbg="turn">Give turn to this player</button></div>
+      <p class="muted small">Choose a player above, then add cards, set stats or clear zones. Cards added to a combo don't trigger anything. Then play normally.</p>
       <div class="row"><label><input type="checkbox" id="dbgReveal" ${ui.reveal ? 'checked' : ''}> show both hands / skip pass screen</label></div>
       <div class="row"><button data-export>Copy game record (JSON)</button></div>
     </div>`;
@@ -253,6 +255,7 @@
       else if (op === 'character') dispatch({ type: 'debug', op, player: p, cardId: document.getElementById('dbgChar').value });
       else if (op === 'set') dispatch({ type: 'debug', op, player: p, stat: document.getElementById('dbgStat').value, value: +document.getElementById('dbgVal').value });
       else if (op === 'turn') dispatch({ type: 'debug', op, player: p });
+      else if (op === 'clear') dispatch({ type: 'debug', op, player: p, zone: document.getElementById('dbgClearZone').value });
       else if (op === 'flip' || op === 'remove') dispatch({ type: 'debug', op, player: p, uid: +t.dataset.uid });
     }
   });
