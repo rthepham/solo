@@ -1,0 +1,125 @@
+﻿Solo The Card Game: 
+
+
+        Solo is a 2 player head to head deckbuilding game paying homage to fighting games as well as uno. 
+
+
+        Objective: Players will play cards from their deck of 40 cards to reduce your opponent's life to zero. A player wins if they eliminate their opponent, or they have the most life when a player runs out of cards in their deck. 
+
+
+        Content: 
+* 4x 135 unique card (27 in each of the five colors)
+* 2x Each of the 12 characters 
+* 2x Life counters 
+* 2x Power counters 
+Card Anatomy: 
+Character Card:
+  
+
+Non-Character Card: 
+  
+
+
+
+
+
+Deck Building: 
+Each player will need to bring a 41 card deck to a game of Solo. Each Solo deck must follow the following restrictions: 
+* One Character 
+* 40 Non-character cards 
+* Each named non-character card can only have the max of 2 copies (Ie: only 2 copies of Red 4 Burning Lion’s Charge are allowed. You can have 2 copies of Red 4 Burning Lion’s Charge  and 2 copies of Red 4 Ashen Afterimage Assault. )
+
+
+Game Set Up: 
+1. Each player takes their character out of their deck and places it in the arena. 
+2. Both players shuffle their deck and cut their opponents. 
+3. Randomly determine who is first (Roll dice, Rock paper scissors, etc.) 
+4. Both players then draw their opening 5 cards. 
+5. Both players may choose to mulligan their hand to the bottom of the deck and draw a new 5 cards. 
+6. Set both players' life to 10 and energy to 10. 
+7. Player one starts the first round with their action. 
+
+
+How to play: 
+
+
+A round of Solo is made up of many turns. Each round is broken down into the following phases: 
+
+
+Start of round:(Skip on first turn)  Player rotates who the first player of the round is here. 
+Action Phase: Players take turns choosing one of two actions. 
+1. Play a card into your combo following the below rules: 
+1. Pay the cost of the card (the Value of the card) 
+2. Place the card in the rightmost slot in combo 
+3. This card can only be legally played there if it matches the number or color next to it. (Note: Facedown cards are considered 0 with the color of your character) 
+4. Activate any combo enter abilities on the played card. 
+2. Engage draw up to two cards and then discard the amount of cards drawn. If both players used the Engage action back to back, start a clash. (Player A engages then Player B engages a clash begins) 
+3. Activate a Feint Ability
+
+
+Start of Clash: Activate any start of clash effects. 
+Clash Damage: Add up the current power of each character as well as the value of all cards in your combo. The player with the greater total deals damage to the other player = to the difference of current power
+ 
+(Example Player at has 5 power and 10 value in their combo. Player B has 3 power and 14 values in combo. Player A’s total power is 10+5=15. Player B’s power is 3+14= 17. Player B would deal 17-15=2 damage to Player A) 
+
+
+End of Clash/Reset: This phase the following things occur in order. 
+1. Each player may discard any number of cards then draw up to five cards.  
+2. 2. Activate all end of clash effect. 
+3. Then each player places all cards in their combo into their discard pile (this is not considered being discarded). 
+4. Check if a player has no deck. 
+
+
+: 
+Rounds will repeat in the above phases until either 
+1. A players life becomes zero 
+2. A player runs out of cards in their deck during the last step of end of clash/reset. 
+
+
+Winning the game: 
+The winner of the game is the player that reduced the others players life to 0. If the game ends do to a player having no cards in dec The player with the most life wins. 
+
+
+Semantic Rules
+
+
+Golden rule: the rules of the cards overrule the rules of the game 
+
+
+Discard zone: The discard zone is a partial information zone. Cards can be face up and face down in it. 
+
+
+Facedown cards can only be looked at by the owner of the facedown card. 
+
+
+Facedown cards are considered zero’s that are the color of your character
+
+
+When multiple effects activate simultaneously, resolve them from left to right starting with the current player's turn effects first
+
+
+Triggered abilities are abilities that happen under certain conditions (example Combo enter is when the card is first played from the hand into the combo). 
+
+
+Keywords/Triggers
+
+
+Combo Enters: When this card is played into the combo from your hand activate this effect 
+
+
+When flipped: When this card is flipped in your combo, activate its effect. 
+
+
+Start of Clash: Activate this effect during the start of the clash phase. 
+
+
+End of clash: Activate this effect in step 2 of the end of clash phase. 
+
+
+Feint: Any time during your turn you may discard this card from your combo to activate its effects. 
+
+
+Style: While this card is in your combo you have the following effect
+
+
+Patience :Combo enter you may flip this card
