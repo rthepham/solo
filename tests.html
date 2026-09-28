@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solo — Tests</title>
+<style>
+  :root { --bg: #fff; --text: #1d1f24; --muted: #667; --ok: #1a7f37; --bad: #cf222e; --row: #f4f5f7; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #16181d; --text: #e8eaef; --muted: #9aa3b2; --ok: #3fb950; --bad: #f85149; --row: #20242c; } }
+  body { background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; margin: 0; padding: 16px; }
+  h1 { margin: 0 0 6px; font-size: 20px; }
+  .sum { font-size: 16px; font-weight: 700; margin: 8px 0 14px; }
+  .sum.okc { color: var(--ok); } .sum.badc { color: var(--bad); }
+  table { border-collapse: collapse; width: 100%; max-width: 1100px; }
+  td, th { text-align: left; padding: 4px 8px; vertical-align: top; }
+  tr:nth-child(even) td { background: var(--row); }
+  .p { color: var(--ok); font-weight: 700; } .f { color: var(--bad); font-weight: 700; }
+  .err { color: var(--bad); font-size: 12px; }
+  .muted { color: var(--muted); }
+  label { margin-right: 12px; }
+  pre#json { display: none; }
+</style>
+</head>
+<body>
+<h1>Solo — automated tests</h1>
+<div class="muted">Core rules plus at least one test per card (135 numbered + 15 characters). Checks follow readings.md with rulings.md applied.</div>
+<div id="sum" class="sum">Running…</div>
+<label><input type="checkbox" id="onlyFail"> show failures only</label>
+<table><thead><tr><th>Result</th><th>Card</th><th>Test</th></tr></thead><tbody id="rows"></tbody></table>
+<pre id="json"></pre>
+<script src="js/cards-data.js"></script>
+<script src="js/rng.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/effects.js"></script>
+<script src="tests/harness.js"></script>
+<script src="tests/core.test.js"></script>
+<script src="tests/cards.test.js"></script>
+<script>
+(function () {
+  const results = T.run();
+  const esc = t => String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const cardIds = Object.keys(Solo.DATA);
+  const covered = new Set(results.filter(r => r.card).map(r => r.card));
+  const missing = cardIds.filter(id => !covered.has(id));
+  const perCard = {};
+  results.filter(r => r.card).forEach(r => { perCard[r.card] = (perCard[r.card] !== false) && r.pass; });
+  const pass = results.filter(r => r.pass).length, fail = results.length - pass;
+  const cardsPass = Object.values(perCard).filter(Boolean).length;
+  const sum = document.getElementById('sum');
+  sum.textContent = `${pass}/${results.length} tests pass (${fail} failing). Cards with all tests passing: ${cardsPass}/150.` +
+    (missing.length ? ` Cards without a test: ${missing.join(', ')}` : ' Every card has a test.');
+  sum.className = 'sum ' + (fail || missing.length ? 'badc' : 'okc');
+  const label = id => { const d = Solo.DATA[id]; return d.kind === 'number' ? `${d.color} ${d.number} ${d.name}` : `${d.name} (${d.color})`; };
+  const draw = () => {
+    const only = document.getElementById('onlyFail').checked;
+    document.getElementById('rows').innerHTML = results.filter(r => !only || !r.pass).map(r =>
+      `<tr><td class="${r.pass ? 'p' : 'f'}">${r.pass ? 'PASS' : 'FAIL'}</td><td>${r.card ? esc(label(r.card)) : '<span class="muted">core rules</span>'}</td>
+       <td>${esc(r.name)}${r.pass ? '' : `<div class="err">${esc(r.error)}</div>`}</td></tr>`).join('');
+  };
+  document.getElementById('onlyFail').onchange = draw;
+  draw();
+  document.getElementById('json').textContent = JSON.stringify({ pass, fail, total: results.length, missing, perCard, results });
+  document.title = `Solo tests: ${pass}/${results.length}`;
+})();
+</script>
+</body>
+</html>

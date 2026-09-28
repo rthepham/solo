@@ -57,3 +57,9 @@ Choices made while building the game where the rulebook, `readings.md` and `ruli
 - **Jack Spades**: a pair is the played card with the same value as the card directly to its left.
 - **Dante**: at 5 colors, both the 3-color and 5-color effects happen.
 - **Flash Finisher**: the whole discard pile, including Flash Finisher itself, is shuffled into the deck.
+- **Sun Cross** only returns **your own** cards. If you discard an opponent's combo card (e.g. with Sun Roundhouse), Sun Cross isn't offered; otherwise it would steal their card.
+- **Hidden information**: a face-down card returned to a hand is logged as "a face-down card". The full state object still contains both hands. That's fine for one shared screen, but online play will need the server to send each player a filtered view.
+
+## Tests
+- `tests.html` runs everything in the browser. `tools/run-tests.ps1` runs the same page in headless Chrome/Edge from the command line (Node isn't installed on this machine) and writes `test-results.json`.
+- Tests build exact board positions with `T.setup`, act only through `Solo.apply`, and answer prompts by card id. A test fails if a prompt it expects doesn't appear, or one it doesn't expect does.

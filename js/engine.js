@@ -351,10 +351,11 @@
   }
 
   function moveToHand(s, card, p) {
+    const wasHidden = card.faceDown;
     removeCard(s, card);
     Object.assign(card, { faceDown: false, silenced: false, keep: false, owner: p });
     P(s, p).hand.push(card);
-    log(s, `${label(s, card)} goes to ${pname(p)}'s hand.`);
+    log(s, `${wasHidden ? 'A face-down card' : label(s, card)} goes to ${pname(p)}'s hand.`);
   }
 
   function putIntoCombo(s, card, p, faceDown) {
@@ -388,7 +389,7 @@
     const d = def(card);
     if (d.onDiscard) d.onDiscard(s, card, card.owner);
     for (let i = 0; i < activeIn(s, discarder, 'Y5-lion').length; i++) gainEnergy(s, discarder, 1);
-    if (!opts.fromSunCross) {
+    if (!opts.fromSunCross && card.owner === discarder) {
       for (const sc of activeIn(s, discarder, 'Y4-sun')) {
         const now = where(s, card);
         if (sc === card || !now || now.zone !== 'discard') break;
