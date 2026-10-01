@@ -85,9 +85,10 @@
     return (e.src ? e.src + ': ' : '') + t;
   }
   // viewer: 0 or 1 for that player's view, 'all' for everything (debug/tests).
+  // Entries already rendered for one player (online views) carry m: true for "only you see this".
   function logView(s, viewer) {
     return s.log.map(e => ({ text: entryText(e, viewer), head: e.k === 'head', dbg: !!e.dbg,
-                             mine: e.p !== undefined && e.p === viewer }));
+                             mine: !!e.m || (e.p !== undefined && e.p === viewer) }));
   }
 
   function nameOf(card) { return DATA[card.id].name; }
@@ -943,6 +944,17 @@
     return { ok: true, state: s };
   }
 
+  // Rebuilds a game from its config and action list (used to restore an online host).
+  function replay(config, actions) {
+    let s = newGame(config);
+    for (const a of actions) {
+      const r = apply(s, a);
+      if (!r.ok) throw new Error('Replay failed at ' + JSON.stringify(a) + ': ' + r.error);
+      s = r.state;
+    }
+    return s;
+  }
+
   // Who needs to act next (for the UI's pass-the-device screen).
   function actor(s) {
     if (s.phase === 'over') return null;
@@ -954,6 +966,9 @@
   Solo.newGame = newGame;
   Solo.buildDeck = buildDeck;
   Solo.apply = apply;
+  Solo.replay = replay;
+  // Online players must run the same rules: bump this whenever rules, cards or the protocol change.
+  Solo.VERSION = 'solo-2026.10.01-1';
   Solo.actor = actor;
   Solo.logView = logView;
   Solo.logText = entryText;

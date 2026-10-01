@@ -23,7 +23,7 @@
 </head>
 <body>
 <h1>Solo — automated tests</h1>
-<div class="muted">Core rules, action-log tests, and at least one test per card (135 numbered + 15 characters). Checks follow readings.md with rulings.md applied.</div>
+<div class="muted">Core rules, action-log tests, online-play tests (simulated host and guest, no network), and at least one test per card (135 numbered + 15 characters). Checks follow readings.md with rulings.md applied.</div>
 <div id="sum" class="sum">Running…</div>
 <label><input type="checkbox" id="onlyFail"> show failures only</label>
 <table><thead><tr><th>Result</th><th>Card</th><th>Test</th></tr></thead><tbody id="rows"></tbody></table>
@@ -32,10 +32,12 @@
 <script src="js/rng.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/effects.js"></script>
+<script src="js/online.js"></script>
 <script src="tests/harness.js"></script>
 <script src="tests/core.test.js"></script>
 <script src="tests/cards.test.js"></script>
 <script src="tests/log.test.js"></script>
+<script src="tests/online.test.js"></script>
 <script>
 (function () {
   const results = T.run();
@@ -55,7 +57,7 @@
   const draw = () => {
     const only = document.getElementById('onlyFail').checked;
     document.getElementById('rows').innerHTML = results.filter(r => !only || !r.pass).map(r =>
-      `<tr><td class="${r.pass ? 'p' : 'f'}">${r.pass ? 'PASS' : 'FAIL'}</td><td>${r.card ? esc(label(r.card)) : `<span class="muted">${r.group === 'log' ? 'action log' : 'core rules'}</span>`}</td>
+      `<tr><td class="${r.pass ? 'p' : 'f'}">${r.pass ? 'PASS' : 'FAIL'}</td><td>${r.card ? esc(label(r.card)) : `<span class="muted">${({ log: 'action log', online: 'online play' })[r.group] || 'core rules'}</span>`}</td>
        <td>${esc(r.name)}${r.pass ? '' : `<div class="err">${esc(r.error)}</div>`}</td></tr>`).join('');
   };
   document.getElementById('onlyFail').onchange = draw;
