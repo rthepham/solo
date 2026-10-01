@@ -12,7 +12,10 @@ $browser = @(
 if (-not $browser) { throw 'No Chrome or Edge found. Open tests.html in a browser instead.' }
 $url = 'file:///' + ((Join-Path $root 'tests.html') -replace '\\', '/')
 $profile = Join-Path ([IO.Path]::GetTempPath()) ('solo-test-profile-' + [Guid]::NewGuid())
+# Chrome logs harmless warnings to stderr; don't let them stop the script.
+$ErrorActionPreference = 'Continue'
 $dom = & $browser --headless=new --disable-gpu --no-first-run --user-data-dir="$profile" --allow-file-access-from-files --virtual-time-budget=60000 --dump-dom $url 2>$null | Out-String
+$ErrorActionPreference = 'Stop'
 Remove-Item -Recurse -Force $profile -ErrorAction SilentlyContinue
 $m = [regex]::Match($dom, '<pre id="json">(.*?)</pre>', 'Singleline')
 if (-not $m.Success -or -not $m.Groups[1].Value) { throw 'Could not read results from tests.html (did a script fail to load?)' }

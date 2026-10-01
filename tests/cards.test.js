@@ -604,7 +604,7 @@
   });
   card('C-dante', 'Dante: 3 colors -> opponent mills 5; 5 colors -> opponent loses life per color in their combo', () => {
     const s = clash(setup({ p: [{ char: 'C-dante', combo: ['R1-blood', 'U1-river', 'Y1-lion'] }] }));
-    logHas(s, 'Dante: 3+ colors.');
+    logHas(s, 'Dante (start of clash): 3+ colors');
     eq(s.players[1].deck.length, 5, '15 - 5 milled - 5 drawn');
     const f = clash(setup({ p: [{ char: 'C-dante', combo: ['R1-blood', 'U1-river', 'Y1-lion', 'G1-forest', 'K1-ink'] }, { combo: ['R1-flame', 'U1-check'], life: 30 }] }));
     eq(f.players[1].life, 30 - 2 - 3);

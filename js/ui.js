@@ -185,6 +185,15 @@
     </div>`;
   }
 
+  // Action log, newest first. Built by the engine; each player only sees
+  // the text they're allowed to (opponents see "draws 2 cards", not names).
+  function logHTML(s) {
+    const viewer = ui.reveal ? 'all' : ui.viewer;
+    const rows = Solo.logView(s, viewer).slice(-500).reverse().map(e =>
+      `<div class="${e.head ? 'head' : ''}${e.dbg ? ' dbg' : ''}${e.mine ? ' mine' : ''}"${e.mine ? ' title="Only you can see this detail"' : ''}>${esc(e.text)}</div>`).join('');
+    return `<div class="logbox"><div class="logtitle">Game log <span class="muted small">newest first${viewer === 'all' ? ' · showing hidden details' : ''}</span></div><div class="log" id="log">${rows}</div></div>`;
+  }
+
   function render() {
     if (!ui.game) { renderSetup(); return; }
     const s = ui.game.state;
@@ -214,10 +223,8 @@
         ${actionsHTML(s)}
         ${playerHTML(s, 1 - top)}
       </div>
-      <div class="side">${debugHTML(s)}<div class="log" id="log">${s.log.slice(-300).map(l => `<div>${esc(l)}</div>`).join('')}</div></div>
+      <div class="side">${debugHTML(s)}${logHTML(s)}</div>
       </div></div>`;
-    const lg = document.getElementById('log');
-    lg.scrollTop = lg.scrollHeight;
     for (const id in ui.dbgKeep) {
       const e = document.getElementById(id);
       if (e) { if (e.type === 'checkbox') e.checked = ui.dbgKeep[id]; else e.value = ui.dbgKeep[id]; }

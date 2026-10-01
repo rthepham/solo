@@ -223,14 +223,14 @@
   core('Start-of-clash effects resolve first player first, then left to right', () => {
     let s = setup({ first: 1, turn: 1, p: [{ char: 'C-master', combo: ['R1-flame', 'R2-flame', 'R3-flame'] }, { char: 'C-master', combo: ['Y1-sun', 'Y2-sun', 'Y3-sun'] }] });
     s = clash(s);
-    const a = s.log.indexOf('Player 2 gains +3 power.'), b = s.log.indexOf('Player 1 gains +3 power.');
+    const lines = T.logText(s), a = lines.findIndex(l => l.includes('Player 2 gains +3 power')), b = lines.findIndex(l => l.includes('Player 1 gains +3 power'));
     ok(a >= 0 && b >= 0 && a < b, 'Player 2 (first this round) resolves before Player 1');
   });
 
   core('Hidden information: face-down cards returned to hand are not named in the shared log', () => {
     const s = play(setup({ p: [{ char: 'C-victoria', hand: ['U9-river'], combo: [{ id: 'R7-flame', down: true }] }] }), 0, 'U9-river');
     ok(has(s, 0, 'hand', 'R7-flame'), 'card returned');
-    ok(!s.log.some(l => l.includes('Flame Snap')), 'log does not reveal it');
+    T.logLacks(s, 'Flame Snap', 1);
   });
 
   core('Debug actions: add card, set stat, set character, give turn, clear zone', () => {

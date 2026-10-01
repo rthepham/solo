@@ -6,9 +6,11 @@ Built only from the designer's rulebook and card spreadsheet (`source/`), `readi
 Double-click `index.html`. Pick a seed, a character and a deck style for each player, then **Start game**. Hand the device over when the "Pass the device" screen appears.
 Tick **Debug mode** on the setup screen for the card/stat editor (both hands visible, no pass screen).
 
+The **Game log** (right side, or the bottom of the screen on a phone) shows what just happened and why, newest first. Each player only sees their own hidden cards named (lines in blue are details only you can see).
+
 ## Test
-- Open `tests.html` in a browser: 179 tests (one per card plus core rules), shown as a pass/fail list.
-- Command line: `powershell -ExecutionPolicy Bypass -File tools\run-tests.ps1` (headless Chrome or Edge).
+- Open `tests.html` in a browser: 189 tests (one per card, core rules, and the action log), shown as a pass/fail list.
+- Command line: `node tools/run-tests.js`, or `powershell -ExecutionPolicy Bypass -File tools\run-tests.ps1` (headless Chrome or Edge).
 
 ## Files
 - `js/engine.js`: rules engine. `Solo.apply(state, action)` is the only way to change the game.

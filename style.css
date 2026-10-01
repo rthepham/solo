@@ -57,9 +57,20 @@ h2 { font-size: 15px; margin: 0 0 8px; }
 .pending label.opt { background: var(--panel2); padding: 4px 8px; border-radius: 6px; cursor: pointer; }
 .error { background: #4a1f22; border: 1px solid var(--danger); border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; }
 
-.side { display: flex; flex-direction: column; gap: 10px; }
-.log { background: var(--panel); border-radius: 8px; padding: 8px 10px; height: 460px; overflow-y: auto; font-size: 12px; }
-.log div { padding: 1px 0; border-bottom: 1px solid #2a2e36; }
+.side { display: flex; flex-direction: column; gap: 10px; position: sticky; top: 12px; align-self: start; max-height: calc(100vh - 24px); }
+.logbox { background: var(--panel); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.logtitle { font-weight: 700; margin-bottom: 4px; }
+.log { overflow-y: auto; font-size: 12px; min-height: 200px; max-height: 70vh; flex: 1; }
+.log div { padding: 2px 0 2px 6px; border-bottom: 1px solid #2a2e36; border-left: 2px solid transparent; }
+.log div.head { color: var(--accent); font-weight: 700; padding-top: 6px; }
+.log div.mine { color: #b9d3ff; border-left-color: #5b8fd9; }
+.log div.dbg { color: #7fd69a; font-style: italic; }
+@media (max-width: 1000px) {
+  .side { position: static; max-height: none; }
+  .logbox { position: fixed; left: 0; right: 0; bottom: 0; height: 30vh; z-index: 5; border-radius: 10px 10px 0 0; border-top: 2px solid var(--border); }
+  .log { max-height: none; min-height: 0; }
+  .wrap { padding-bottom: 32vh; }
+}
 .debug { background: #1e2a22; border: 1px solid #2e5a3a; border-radius: 8px; padding: 10px; }
 .debug .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
 .debug select { max-width: 100%; }

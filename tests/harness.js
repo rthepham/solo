@@ -103,7 +103,10 @@
     if (ja !== jb) throw new Error(`${msg || 'values differ'}: expected ${jb}, got ${ja}`);
   };
   T.ok = (cond, msg) => { if (!cond) throw new Error(msg || 'assertion failed'); };
-  T.logHas = (s, text) => T.ok(s.log.some(l => l.includes(text)), `log should contain "${text}"`);
+  // Log lines as one player sees them (viewer 0 or 1), or everything ('all').
+  T.logText = (s, viewer = 'all') => Solo.logView(s, viewer).map(e => e.text);
+  T.logHas = (s, text, viewer) => T.ok(T.logText(s, viewer).some(l => l.includes(text)), `log should contain "${text}"`);
+  T.logLacks = (s, text, viewer) => T.ok(!T.logText(s, viewer).some(l => l.includes(text)), `log should not contain "${text}"`);
   T.rejects = (s, action, msg) => {
     const r = Solo.apply(s, action);
     T.ok(!r.ok, msg || 'action should be rejected');
