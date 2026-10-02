@@ -216,12 +216,18 @@
     H.gainEnergy(s, p, downs.length);
   } };
   E['U9-check'] = { onEnter(s, c, p) {
-    if (!nextTo(s, c, 0, 'flip a card 4 times (either combo)')) return;
-    for (let i = 1; i <= 4; i++) {
-      const cands = faceUp(P(s, p).combo.concat(P(s, opp(p)).combo));
-      const t = H.chooseCard(s, p, `Check Finisher: flip a card (${i} of 4)`, cands);
-      if (!t) break;
-      H.flip(s, t, p);
+    // Ruling: one card, flipped 4 times. It turns face down once; its "when flipped" triggers 4 times.
+    if (!nextTo(s, c, 0, 'choose a card and flip it 4 times')) return;
+    const t = H.chooseCard(s, p, 'Check Finisher: choose a card (either combo) to flip 4 times', faceUp(P(s, p).combo.concat(P(s, opp(p)).combo)));
+    if (!t) { H.log(s, 'no face-up card to flip.'); return; }
+    if (!H.flip(s, t, p)) return;            // stopped by a reaction or Umbra Roundhouse: all four are stopped
+    const onFlip = Solo.def(t).onFlip;
+    if (!onFlip) { H.log(s, `${H.upLabel(t)} has no "when flipped" ability, so the other 3 flips do nothing.`); return; }
+    for (let i = 2; i <= 4; i++) {
+      const loc = H.where(s, t);
+      if (!loc || loc.zone !== 'combo' || !t.faceDown) { H.log(s, 'the card is no longer flipped in a combo, so the remaining flips stop.'); return; }
+      H.log(s, `flip ${i} of 4.`);
+      H.trigger(s, `${H.nameOf(t)} (when flipped)`, () => onFlip(s, t, loc.p));
     }
   } };
   E['U9-cyber'] = { costMod: (s, p, c, cost) => cost - 2 * faceDownCount(s, p) };

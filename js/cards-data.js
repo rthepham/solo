@@ -746,7 +746,7 @@ window.SOLO_CARD_DATA = [
         "family":  "Check",
         "sheetName":  "Check Finisher",
         "text":  "combo enter: if played next to a zero flip a card 4 times.",
-        "reading":  "Combo enter: if the card next to it is a 0, do \"flip a card\" four times (any card in either combo each time). [UNCLEAR] Read as four separate flips, not one card flipped four times."
+        "reading":  "Combo enter: if the card next to it is a 0, choose one face-up card in either combo and flip it 4 times: it turns face down once and its \"when flipped\" ability triggers 4 times (for the player whose combo it is in). A reaction that stops the flip (Flash Jab, Life Jab) or Umbra Roundhouse stops all four. [RULING]"
     },
     {
         "id":  "U9-cyber",

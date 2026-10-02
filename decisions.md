@@ -44,7 +44,7 @@ Choices made while building the game where the rulebook, `readings.md` and `ruli
 - **Flame Straight**: only face-up discard cards can be chosen. Choosing none is allowed.
 - **Phoenix Uppercut**: the opponent sees the damage amount, then picks which cards to discard.
 - **Flame Snap** with Flame Uppercut: the "lose all but 1 life" becomes a life *gain* of the same amount.
-- **Check Finisher**: four separate flips, each of any face-up card in either combo (yours included).
+- **Check Finisher** (owner ruling, 2026-10-01, replaces my earlier "four separate flips"): choose one face-up card in either combo; it turns face down once and its "when flipped" triggers 4 times, for the player whose combo it is in. A reaction or Umbra Roundhouse that stops the flip stops all four. If the card leaves the combo or is turned face up partway (e.g. its own ability returns it to hand), the remaining triggers stop. Online version bumped to `solo-2026.10.01-4`.
 - **Forest Hook**: with only 1 card left in the deck, that card is played. Nothing is discarded.
 - **Life Hook**: the "card next to it" is its left neighbor (it's always rightmost when it enters). With no neighbor, nothing happens.
 - **Life Uppercut**: true when your lowest combo value is greater than the opponent's highest (always true if their combo is empty).

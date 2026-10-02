@@ -80,7 +80,7 @@
     'U8-check': 'End of clash: if you dealt 2 or less damage, draw 2.',
     'U8-cyber': 'Combo enter: if your combo has two or more 0s, your opponent loses 2 energy.',
     'U9-river': 'Combo enter: return all your face-down combo cards to your hand. +1 energy each.',
-    'U9-check': 'Combo enter: if next to a 0, flip a card in either combo, 4 times.',
+    'U9-check': 'Combo enter: if next to a 0, choose a card in either combo and flip it 4 times (its When flipped triggers 4 times).',
     'U9-cyber': 'Costs 2 less per face-down card in your combo.',
 
     // ---------------------------------------------------------- yellow

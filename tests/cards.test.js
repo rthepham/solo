@@ -234,10 +234,30 @@
     const s = play(setup({ p: [{ char: V, hand: ['U9-river'], combo: [D('U1-river'), D('U2-river')] }] }), 0, 'U9-river');
     eq([ids(s, 0, 'hand'), s.players[0].energy], [['U1-river', 'U2-river'], 3]);
   });
-  card('U9-check', 'Combo enter: next to a 0, flip cards four times', () => {
-    const s = play(setup({ p: [{ char: V, hand: ['U9-check'], combo: [D('U1-river')] }, { combo: ['R1-flame', 'R2-flame', 'R3-flame', 'R4-flame'] }] }), 0, 'U9-check',
-      [pick('R1-flame'), pick('R2-flame'), pick('R3-flame'), pick('R4-flame')]);
-    ok(s.players[1].combo.every(c => c.faceDown));
+  card('U9-check', 'Combo enter (ruling): next to a 0, flip one card 4 times: its "when flipped" triggers 4 times', () => {
+    // Your own River Jab: the opponent loses 2 Power, four times. Only that card is flipped.
+    const s = play(setup({ p: [{ char: V, hand: ['U9-check'], combo: ['U1-river', D('U2-river')] }, { combo: ['R1-flame'], power: 10 }] }), 0, 'U9-check',
+      [pick('U1-river')]);
+    eq([s.players[1].power, T.find(s, 0, 'combo', 'U1-river').faceDown, s.players[1].combo[0].faceDown], [2, true, false]);
+    eq(T.logText(s).filter(l => l.startsWith('River Jab (when flipped)')).length, 4, 'triggered 4 times');
+    // Draw-then-discard Patience card: 4 draws and 4 discards.
+    const c = play(setup({ p: [{ char: V, hand: ['U9-check'], combo: ['U1-cyber', D('U2-river')] }] }), 0, 'U9-check',
+      [pick('U1-cyber')]);   // each discard is automatic: only the card just drawn is in hand
+    eq([c.players[0].hand.length, c.players[0].discard.length], [0, 4]);
+    // A card without a "when flipped" ability is just flipped.
+    const r = play(setup({ p: [{ char: V, hand: ['U9-check'], combo: [D('U1-river')] }, { combo: ['R1-flame', 'R2-flame'] }] }), 0, 'U9-check', [pick('R1-flame')]);
+    eq(r.players[1].combo.map(x => x.faceDown), [true, false]);
+    logHas(r, 'so the other 3 flips do nothing');
+    // Not next to a 0: nothing.
+    const n = play(setup({ p: [{ char: V, hand: ['U9-check'], combo: ['U9-river'] }, { combo: ['R1-flame'] }] }), 0, 'U9-check');
+    eq(n.players[1].combo[0].faceDown, false);
+  });
+  card('U9-check', 'Ruling: picking an opponent\'s card triggers it for them; Flash Jab stops all four flips', () => {
+    const base = () => setup({ p: [{ char: V, hand: ['U9-check'], combo: [D('U2-river')], power: 10 }, { combo: ['Y1-flash', 'U1-river'] }] });
+    const used = play(base(), 0, 'U9-check', [pick('U1-river'), YES]);
+    eq([used.players[0].power, T.find(used, 1, 'combo', 'U1-river').faceDown, T.has(used, 1, 'discard', 'Y1-flash')], [10, false, true]);
+    const declined = play(base(), 0, 'U9-check', [pick('U1-river'), NO]);
+    eq(declined.players[0].power, 2, 'River Jab is theirs: Player 1 loses 2 Power four times');
   });
   card('U9-cyber', 'Costs 2 less per face-down card in your combo', () => {
     eq(cost(setup({ p: [{ hand: ['U9-cyber'], combo: [D('U1-river'), D('U2-river')] }] }), 0, 'U9-cyber'), 5);

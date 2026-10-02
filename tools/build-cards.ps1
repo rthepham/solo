@@ -44,6 +44,7 @@ $rulings = @{
   'Yellow 9 Lion Finisher' = 'Costs 1 less energy for each card YOU discarded this round, from any zone (the opponent''s discards don''t count; reset-step-3 cleanup doesn''t count). [RULING]'
   'Yellow 4 Sun Cross'     = 'Reaction Feint (doesn''t use your action): while in your combo, when you discard another card you may discard Sun Cross from your combo; if you do, return that card to your hand. [RULING]'
   'Green Forest Oak'       = 'Whenever you play a Green card whose value is EXACTLY 3 higher than your opponent''s last played (rightmost) combo card (0 if empty or face down), gain +1 energy. [RULING]'
+  'Blue 9 Check Finisher'  = 'Combo enter: if the card next to it is a 0, choose one face-up card in either combo and flip it 4 times: it turns face down once and its "when flipped" ability triggers 4 times (for the player whose combo it is in). A reaction that stops the flip (Flash Jab, Life Jab) or Umbra Roundhouse stops all four. [RULING]'
 }
 
 $colors = @{ 4 = 'Red'; 5 = 'Blue'; 6 = 'Yellow'; 7 = 'Green'; 8 = 'Black' }

@@ -22,3 +22,4 @@ Everything in `readings.md` stands, including its [UNCLEAR] assumptions, except 
 - **Lion Finisher:** costs 1 less for each card **you** discarded this round. The opponent's discards don't count.
 - **Sun Cross:** a **reaction** feint, like Flash Jab. When you discard another card, you may discard Sun Cross from your combo. If you do, return that card to your hand. It doesn't use your action.
 - **Forest Oak:** the played Green card must be **exactly** 3 higher than the opponent's last card, not 3 or more.
+- **Check Finisher** (added 2026-10-01): choose **one** face-up card in either combo and flip it 4 times: it turns face down once and its "when flipped" ability triggers 4 times. A reaction that stops the flip (Flash Jab, Life Jab) or Umbra Roundhouse stops all four. If you pick an opponent's card, its ability triggers for them.

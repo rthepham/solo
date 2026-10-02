@@ -88,7 +88,7 @@ Notes are only given where something is doubtful, partly tested, or depends on a
 | Blue 8 Check Roundhouse | PASS |  |
 | Blue 8 Cyber Roundhouse | PASS |  |
 | Blue 9 River Finisher | PASS |  |
-| Blue 9 Check Finisher | PASS | Only tested flipping the opponent's cards. The option to flip your own cards is implemented but untested. |
+| Blue 9 Check Finisher | PASS | Changed by owner ruling (2026-10-01): one card flipped 4 times, its "when flipped" triggers 4 times. Tested on your own and the opponent's cards, a card with no "when flipped", Flash Jab stopping all four, and not next to a 0. |
 | Blue 9 Cyber Finisher | PASS |  |
 
 ### Yellow
