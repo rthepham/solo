@@ -223,7 +223,9 @@
 
   // ---------------------------------------------------------------- helpers
   const def = id => Solo.DATA[id];
-  const moveOf = d => d.kind === 'number' ? d.name.split(' ').slice(1).join(' ') : d.archetype;
+  // Card face text: the reading without my interpretation notes ([UNCLEAR] ..., [RULING]); those go in the inspector.
+  const faceText = d => d.reading.replace(/\s*\[UNCLEAR\][\s\S]*$/, '').replace(/\s*\[RULING\]/g, '');
+  const noteText = d => { const m = d.reading.match(/\[UNCLEAR\]\s*([\s\S]*)$/); return m ? m[1] : ''; };
   const canSee = c => !c.hidden && c.id && (!c.faceDown || ui.reveal || c.owner === ui.viewer);
   const pName = p => online() ? (p === ui.viewer ? 'You' : 'Opponent') : `Player ${p + 1}`;
   const pFull = p => online() ? (p === ui.viewer ? `You (Player ${p + 1})` : `Opponent (Player ${p + 1})`) : `Player ${p + 1}${ui.viewer === p ? ' (you)' : ''}`;
@@ -261,9 +263,8 @@
     const showVal = val !== null && val !== d.number;
     return `<div class="card ${d.color} ${cls} ${c.silenced ? 'silenced' : ''}" data-uid="${uid}" data-cid="${c.id}">
       ${c.silenced ? '<span class="tag">no abilities</span>' : ''}
-      <div class="top"><div class="n">${d.number}</div><div class="mv">${esc(moveOf(d))}<br>${esc(d.name.split(' ')[0])}</div></div>
-      <div class="nm">${esc(d.name)}</div>
-      <div class="tx">${esc(d.reading)}</div>
+      <div class="top"><div class="n">${d.number}</div><div class="nm">${esc(d.name)}</div></div>
+      <div class="tx">${esc(faceText(d))}</div>
       ${o.buttons ? `<div class="btns">${o.buttons}</div>` : ''}
       ${showVal ? `<div class="val" title="current value">${val}</div>` : ''}</div>`;
   }
@@ -396,7 +397,7 @@
     const big = d.kind === 'number' ? cardHTML({ uid: null, id, faceDown: false, owner: ui.viewer }) : '';
     return `<div class="inspector ${ui.pinned ? 'pinned' : ''}" id="inspector"><button class="closebtn" data-unpin>✕</button>
       <div class="big">${big}<div class="full"><div class="t">${esc(d.kind === 'number' ? `${d.color} ${d.number} ${d.name}` : `${d.name} — ${d.color} ${d.archetype}`)}</div>
-      ${esc(d.reading)}${d.text && d.text !== d.reading ? `<div class="orig">Printed: ${esc(d.text)}</div>` : ''}</div></div></div>`;
+      ${esc(d.kind === 'number' ? faceText(d) : d.reading)}${d.kind === 'number' && noteText(d) ? `<div class="orig">Rules note: ${esc(noteText(d))}</div>` : ''}${d.text && d.text !== d.reading ? `<div class="orig">Printed: ${esc(d.text)}</div>` : ''}</div></div></div>`;
   }
 
   function logHTML(s, fresh) {
