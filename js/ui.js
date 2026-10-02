@@ -9,6 +9,7 @@
   const O = Solo.Online;
   const app = document.getElementById('app');
   const esc = t => String(t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  const COLOR_VAR = { Red: 'var(--red)', Blue: 'var(--blue)', Yellow: 'var(--yellow)', Green: 'var(--green)', Black: 'var(--black)' };
 
   const ui = {
     mode: null,       // null (setup screen) | 'hotseat' | 'host' | 'guest'
@@ -19,9 +20,21 @@
     error: '',
     debug: false,
     reveal: false,
-    showDiscard: [false, false],
     setupTab: 'hotseat',
     joinCode: '',
+    // screen-only state (never part of the game)
+    sel: null,        // selected hand card uid
+    picks: [],        // values picked so far in a "choose several" prompt
+    pickKey: '',      // which prompt `picks` belongs to
+    num: 0,           // value in a "choose a number" prompt
+    drawer: null,     // player whose discard pile is open
+    pinned: null,     // card id shown in the inspector (tap / click)
+    hover: null,      // card id under the mouse
+    clashAt: null,    // log index of the clash being shown in the results overlay
+    overSeen: false,  // game-over overlay dismissed
+    logMin: false,    // narrow screens: log collapsed
+    snap: null,       // previous render, for highlights: { key, stats, cards, logLen, myTurn }
+    toast: '',
   };
   window.soloUI = ui;
   const online = () => ui.mode === 'host' || ui.mode === 'guest';
@@ -30,11 +43,10 @@
   // sessionStorage: survives a refresh of this tab (auto-resume).
   // localStorage: the host's game record and the guest's seat token, per room.
   const store = {
-    get(area, k) { try { const v = root()[area].getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } },
-    set(area, k, v) { try { root()[area].setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
-    del(area, k) { try { root()[area].removeItem(k); } catch (e) { /* storage unavailable */ } },
+    get(area, k) { try { const v = window[area].getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } },
+    set(area, k, v) { try { window[area].setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+    del(area, k) { try { window[area].removeItem(k); } catch (e) { /* storage unavailable */ } },
   };
-  function root() { return window; }
 
   // ---------------------------------------------------------------- setup
   function playableChars() { return Solo.CHARACTERS.filter(c => Solo.EFFECTS[c.id]); }
@@ -104,17 +116,23 @@
     }
   }
 
+  function resetScreen() {
+    Object.assign(ui, { logSeen: null, sel: null, picks: [], pickKey: '', drawer: null, pinned: null, clashAt: null, overSeen: false, snap: null, toast: '', error: '' });
+  }
+
   function startGame(config) {
+    resetScreen();
     ui.mode = 'hotseat';
     ui.game = { config, actions: [], state: Solo.newGame(config) };
-    ui.viewer = null; ui.passTo = null; ui.error = '';
+    ui.viewer = null; ui.passTo = null;
     dispatch({ type: 'start' });
   }
 
   // ---------------------------------------------------------------- online setup
   function startHost({ choice, code, record }) {
+    resetScreen();
     ui.mode = 'host';
-    ui.viewer = 0; ui.debug = false; ui.reveal = false; ui.passTo = null; ui.error = '';
+    ui.viewer = 0; ui.debug = false; ui.reveal = false; ui.passTo = null;
     const save = rec => { if (ui.online && ui.online.code) store.set('localStorage', 'solo-host-' + ui.online.code, { record: rec }); };
     const opts = { host: choice, onChange: render, save };
     let session;
@@ -138,8 +156,9 @@
   }
 
   function startGuest(code, choice) {
+    resetScreen();
     ui.mode = 'guest';
-    ui.viewer = 1; ui.debug = false; ui.reveal = false; ui.passTo = null; ui.error = '';
+    ui.viewer = 1; ui.debug = false; ui.reveal = false; ui.passTo = null;
     let token = store.get('localStorage', 'solo-guest-token-' + code);
     if (!token) { token = O.newToken(); store.set('localStorage', 'solo-guest-token-' + code, token); }
     const session = new O.GuestSession(Object.assign({ token, onChange: render }, choice));
@@ -180,6 +199,7 @@
   }
 
   function dispatch(action) {
+    ui.sel = null;
     if (ui.mode === 'host') {
       const res = ui.online.session.localAction(action);
       ui.error = res.ok ? '' : res.error;
@@ -201,102 +221,193 @@
   ui.dispatch = dispatch;
   const errorText = () => ui.mode === 'guest' ? ui.online.session.error : ui.error;
 
-  // ---------------------------------------------------------------- rendering
-  const pLabel = p => online() ? (p === ui.viewer ? `Player ${p + 1} (you)` : `Player ${p + 1} (opponent)`) : `Player ${p + 1}${ui.viewer === p ? ' (you)' : ''}`;
+  // ---------------------------------------------------------------- helpers
+  const def = id => Solo.DATA[id];
+  const moveOf = d => d.kind === 'number' ? d.name.split(' ').slice(1).join(' ') : d.archetype;
+  const canSee = c => !c.hidden && c.id && (!c.faceDown || ui.reveal || c.owner === ui.viewer);
+  const pName = p => online() ? (p === ui.viewer ? 'You' : 'Opponent') : `Player ${p + 1}`;
+  const pFull = p => online() ? (p === ui.viewer ? `You (Player ${p + 1})` : `Opponent (Player ${p + 1})`) : `Player ${p + 1}${ui.viewer === p ? ' (you)' : ''}`;
+  const myPending = s => s.pending && (ui.reveal || s.pending.player === ui.viewer) && s.pending.request;
+  const canAct = (s, p) => s.phase === 'action' && !s.pending && s.turn === p && ui.viewer === p;
 
-  function cardHTML(s, c, opts = {}) {
-    const hidden = c.hidden || (c.faceDown && !(ui.reveal || c.owner === ui.viewer));
-    const d = hidden ? null : Solo.DATA[c.id];
-    const val = opts.value !== undefined ? opts.value : null;
-    if (c.faceDown) {
-      return `<div class="card down ${c.silenced ? 'silenced' : ''}" title="${hidden ? 'Face-down card' : esc(d.name + ' — ' + d.reading)}">
-        <div class="num">${val === null ? 0 : val}</div>
-        <div class="nm">Face down</div>
-        ${hidden ? '' : `<div class="txt">${esc(d.color + ' ' + d.number + ' ' + d.name)}</div>`}
-        <div class="btns">${opts.buttons || ''}</div></div>`;
-    }
-    return `<div class="card ${d.color} ${c.silenced ? 'silenced' : ''}" title="${esc(d.name + ' — ' + d.reading)}">
-      <div class="num">${d.number}</div>${c.silenced ? '<span class="tag">no abilities</span>' : ''}
-      <div class="nm">${esc(d.name)}</div>
-      <div class="txt">${esc(d.reading)}</div>
-      <div class="btns">${opts.buttons || ''}</div></div>`;
+  // Options of the current prompt, by value, for highlighting board cards.
+  function promptInfo(s) {
+    const r = myPending(s);
+    if (!r) return null;
+    const key = `${s.log.length}|${s.pending.player}|${r.prompt}|${r.options.length}`;
+    if (key !== ui.pickKey) { ui.pickKey = key; ui.picks = []; ui.num = r.min || 0; }
+    const values = new Set(r.options.filter(o => typeof o.value === 'number').map(o => o.value));
+    return { r, values };
   }
 
-  function playerHTML(s, p) {
+  // ---------------------------------------------------------------- cards
+  // c: a card (or a hidden placeholder). o: { value, buttons, cls, uid }
+  function cardHTML(c, o = {}) {
+    const uid = c.uid === null || c.uid === undefined ? '' : c.uid;
+    const pi = o.pi;
+    let cls = o.cls || '';
+    if (pi && uid !== '' && pi.values.has(c.uid)) cls += pi.r.kind === 'many' && ui.picks.includes(c.uid) ? ' picked' : ' opt';
+    const val = o.value !== undefined && o.value !== null ? o.value : null;
+    if (!canSee(c)) {
+      return `<div class="card back ${cls}" data-uid="${uid}" title="Face-down card">
+        <div class="nm">Face down</div>${val !== null ? `<div class="val">${val}</div>` : ''}${o.buttons ? `<div class="btns">${o.buttons}</div>` : ''}</div>`;
+    }
+    const d = def(c.id);
+    if (c.faceDown) {
+      return `<div class="card back ${cls} ${c.silenced ? 'silenced' : ''}" data-uid="${uid}" data-cid="${c.id}" title="Face down (you can see it)">
+        <div class="nm">Face down</div><div class="peek">${d.color} ${d.number}<br>${esc(d.name)}</div>
+        ${val !== null ? `<div class="val">${val}</div>` : ''}${o.buttons ? `<div class="btns">${o.buttons}</div>` : ''}</div>`;
+    }
+    const showVal = val !== null && val !== d.number;
+    return `<div class="card ${d.color} ${cls} ${c.silenced ? 'silenced' : ''}" data-uid="${uid}" data-cid="${c.id}">
+      ${c.silenced ? '<span class="tag">no abilities</span>' : ''}
+      <div class="top"><div class="n">${d.number}</div><div class="mv">${esc(moveOf(d))}<br>${esc(d.name.split(' ')[0])}</div></div>
+      <div class="nm">${esc(d.name)}</div>
+      <div class="tx">${esc(d.reading)}</div>
+      ${o.buttons ? `<div class="btns">${o.buttons}</div>` : ''}
+      ${showVal ? `<div class="val" title="current value">${val}</div>` : ''}</div>`;
+  }
+
+  // ---------------------------------------------------------------- board
+  function statHTML(p, k, label, value, extra, pct) {
+    return `<div class="stat ${k}" data-stat="${p}-${k}"><div class="k">${label}</div><div class="v">${value}${extra ? `<small>${extra}</small>` : ''}</div>
+      ${pct !== undefined ? `<div class="meter"><i style="width:${Math.max(0, Math.min(100, pct))}%"></i></div>` : ''}</div>`;
+  }
+
+  function stripHTML(s, p) {
     const pl = s.players[p];
-    const ch = Solo.DATA[pl.character];
-    const myTurn = s.phase === 'action' && s.turn === p && !s.pending;
-    const canAct = myTurn && (ui.viewer === p);
-    const showHand = ui.reveal || ui.viewer === p;
-    const combo = pl.combo.map(c => {
-      let b = '';
-      if (canAct && Solo.feintable(s, p).includes(c)) b += `<button data-act="feint" data-uid="${c.uid}">Feint</button>`;
-      if (ui.debug) b += `<button data-dbg="flip" data-uid="${c.uid}" title="debug: toggle face">⟲</button><button data-dbg="remove" data-uid="${c.uid}" title="debug: remove">✕</button>`;
-      return cardHTML(s, c, { value: H.valueOf(s, c), buttons: b });
-    }).join('') || '<span class="muted small">empty</span>';
-    const hand = showHand ? (pl.hand.map(c => {
-      let b = '';
-      if (canAct) {
-        const chk = Solo.canPlay(s, p, c.uid);
-        b += `<button data-act="play" data-uid="${c.uid}" ${chk.ok ? '' : 'disabled'} title="${esc(chk.reason || '')}">Play (${chk.cost})</button>`;
-      }
-      if (ui.debug) b += `<button data-dbg="remove" data-uid="${c.uid}">✕</button>`;
-      return cardHTML(s, c, { buttons: b });
-    }).join('') || '<span class="muted small">no cards</span>') : `<span class="muted">${pl.hand.length} cards (hidden)</span>`;
-    const disc = ui.showDiscard[p] ? `<div class="discardlist">${pl.discard.map(c =>
-      c.hidden || (c.faceDown && !(ui.reveal || c.owner === ui.viewer)) ? '<div class="card mini down"><div class="nm">Face down</div></div>'
-        : `<div class="card mini ${c.faceDown ? 'down' : Solo.DATA[c.id].color}" title="${esc(Solo.DATA[c.id].reading)}"><div class="nm">${Solo.DATA[c.id].number} ${esc(Solo.DATA[c.id].name)}${c.faceDown ? ' (face down)' : ''}</div></div>`).join('') || '<span class="muted small">empty</span>'}</div>` : '';
-    return `<div class="player ${s.turn === p && s.phase === 'action' ? 'active' : ''}">
-      <div class="head">
-        <span class="pname">${pLabel(p)}</span>
-        <span>${esc(ch.name)} <span class="muted">— ${ch.color} ${esc(ch.archetype)}</span></span>
-        ${s.firstPlayer === p ? '<span class="stat">first this round</span>' : ''}
+    const ch = def(pl.character);
+    const active = (s.phase === 'action' && s.turn === p && !s.pending) || (s.pending && s.pending.player === p);
+    const handBacks = p === ui.viewer || ui.reveal ? '' :
+      `<div class="backs" title="Cards in hand">${pl.hand.slice(0, 10).map(() => '<div class="mini"></div>').join('')}<span class="cnt">${pl.hand.length} in hand</span></div>`;
+    return `<div class="pstrip ${active ? 'active' : ''}">
+      <div class="who" data-cid="${pl.character}">
+        <div class="portrait" style="background:${COLOR_VAR[ch.color]}">${esc(ch.name[0])}</div>
+        <div><div class="pn">${pFull(p)}</div><div class="cname">${esc(ch.name)} · ${ch.color} ${esc(ch.archetype)}</div>
+        ${s.firstPlayer === p ? '<div class="first">★ first this round</div>' : ''}</div>
       </div>
-      <div class="charline">${esc(ch.reading)}</div>
-      <div class="stats">
-        <span class="stat">Life <b>${pl.life}</b></span>
-        <span class="stat">Energy <b>${pl.energy}</b>/${pl.maxEnergy}</span>
-        <span class="stat">Power <b>${pl.power}</b></span>
-        <span class="stat">Clash total <b>${Solo.clashTotal(s, p)}</b></span>
-        <span class="stat">Deck <b>${pl.deck.length}</b></span>
-        <span class="stat">Hand <b>${pl.hand.length}</b></span>
-        <button class="stat" data-toggle-discard="${p}">Discard <b>${pl.discard.length}</b> ${ui.showDiscard[p] ? '▲' : '▼'}</button>
+      <div class="bars">
+        ${statHTML(p, 'life', '♥ Life', pl.life, '', pl.life * 10)}
+        ${statHTML(p, 'energy', '⚡ Energy', pl.energy, ' / ' + pl.maxEnergy, pl.energy / Math.max(1, pl.maxEnergy) * 100)}
+        ${statHTML(p, 'power', '✊ Power', pl.power)}
+        ${statHTML(p, 'total', 'Σ Clash total', Solo.clashTotal(s, p))}
       </div>
-      ${disc}
-      <div class="zone-label">Combo (left → right)</div><div class="cards">${combo}</div>
-      <div class="zone-label">Hand</div><div class="cards">${hand}</div>
+      <div class="piles">
+        ${handBacks}
+        <div class="pile" title="Deck">${pl.deck.length}<span class="pl">deck</span></div>
+        <button class="pile" data-discard="${p}" title="Open discard pile">${pl.discard.length}<span class="pl">discard ▾</span></button>
+      </div>
     </div>`;
   }
 
-  function pendingHTML(s) {
-    const pd = s.pending;
-    if (!pd) return '';
-    if (!ui.reveal && ui.viewer !== pd.player) return `<div class="pending">${online() ? 'Waiting for opponent…' : `Waiting for Player ${pd.player + 1} to choose…`}</div>`;
-    const r = pd.request;
-    let body = '';
-    if (r.kind === 'one') body = `<div class="opts">${r.options.map((o, i) => `<button data-choose="${i}">${esc(o.label)}</button>`).join('')}</div>`;
-    else if (r.kind === 'many') body = `<div class="opts">${r.options.map((o, i) => `<label class="opt"><input type="checkbox" data-many="${i}"> ${esc(o.label)}</label>`).join('')}</div>
-        <div class="opts"><span class="muted small">Choose ${r.min === r.max ? r.min : r.min + '–' + r.max}</span><button class="primary" data-choose-many>Confirm</button></div>`;
-    else if (r.kind === 'number') body = `<div class="opts"><input type="number" id="numpick" min="${r.min}" max="${r.max}" value="${r.min}"> <span class="muted small">${r.min}–${r.max}</span><button class="primary" data-choose-num>OK</button></div>`;
-    return `<div class="pending"><b>${online() ? 'Your choice' : `Player ${pd.player + 1}`}:</b> ${esc(r.prompt)}${body}</div>`;
+  function laneHTML(s, p, pi) {
+    const pl = s.players[p];
+    const act = canAct(s, p);
+    const feints = act ? Solo.feintable(s, p) : [];
+    const cards = pl.combo.map(c => {
+      let b = '';
+      if (feints.includes(c)) b += `<button data-feint="${c.uid}" title="Use this card's Feint (takes your action)">Feint</button>`;
+      if (ui.debug) b += `<button data-dbg="flip" data-uid="${c.uid}" title="debug: toggle face">⟲</button><button data-dbg="remove" data-uid="${c.uid}" title="debug: remove">✕</button>`;
+      return cardHTML(c, { value: H.valueOf(s, c), buttons: b, pi, cls: feints.includes(c) ? 'feintable' : '' });
+    }).join('') || '<span class="empty">empty combo</span>';
+    const vals = H.comboValues(s, p);
+    return `<div class="lane"><div class="lanelbl">${pName(p)} combo</div><div class="cards">${cards}</div>
+      <div class="sum"><b>${Solo.clashTotal(s, p)}</b><span>${pl.power} power<br>+ ${vals.reduce((a, b) => a + b, 0)} combo</span></div></div>`;
   }
 
-  function actionsHTML(s) {
-    if (s.phase !== 'action' || s.pending) return '';
+  function handHTML(s, p, pi) {
+    const pl = s.players[p];
+    const act = canAct(s, p);
+    if (ui.sel !== null && !pl.hand.some(c => c.uid === ui.sel)) ui.sel = null;
+    const cards = pl.hand.map(c => {
+      let b = '', cls = '';
+      if (act) {
+        const chk = Solo.canPlay(s, p, c.uid);
+        cls = chk.ok ? 'playable' : 'unplayable';
+        if (ui.sel === c.uid) {
+          cls += ' sel';
+          b = chk.ok ? `<button class="primary" data-play="${c.uid}">Play · ${chk.cost}⚡</button>` : `<span class="why">${esc(chk.reason)}</span>`;
+        }
+      }
+      if (ui.debug) b += `<button data-dbg="remove" data-uid="${c.uid}">✕</button>`;
+      return cardHTML(c, { buttons: b, cls, pi });
+    }).join('') || '<span class="empty">no cards in hand</span>';
+    return `<div class="cards hand">${cards}</div>`;
+  }
+
+  // The bar between the lanes and your hand: your prompt, your turn's actions, or "waiting".
+  function decideHTML(s, pi) {
+    if (s.phase === 'over') return '';
+    const me = ui.viewer;
+    if (s.pending) {
+      if (!pi) return `<div class="decide wait">${online() ? 'Waiting for opponent…' : `Waiting for Player ${s.pending.player + 1} to choose…`}</div>`;
+      const r = pi.r;
+      const cardOpts = r.options.filter(o => typeof o.value === 'number');
+      const other = r.options.map((o, i) => [o, i]).filter(([o]) => typeof o.value !== 'number');
+      // Cards already on the board just glow there; the prompt only draws the others (discard pile, deck).
+      const onBoard = uid => s.players.some((pl, p) => pl.combo.some(c => c.uid === uid) ||
+        ((p === ui.viewer || ui.reveal) && pl.hand.some(c => c.uid === uid)));
+      const optCards = cardOpts.filter(o => !onBoard(o.value)).map(o => {
+        const found = findCard(s, o.value);
+        const c = found || { uid: o.value, id: o.card || null, owner: o.card ? me : 1 - me, faceDown: !!o.faceDown, hidden: !o.card };
+        const loc = (o.label.match(/\[(.*)\]$/) || [])[1] || '';
+        return `<div class="optcard">${cardHTML(Object.assign({}, c, { uid: o.value }), { pi, value: found && H.where(s, found) && H.where(s, found).zone === 'combo' ? H.valueOf(s, found) : undefined })}<div class="loc">${esc(loc)}</div></div>`;
+      }).join('');
+      let controls = '';
+      if (r.kind === 'one') controls = other.map(([o, i]) => `<button data-opt="${i}" ${o.value === true ? 'class="primary"' : ''}>${esc(o.label)}</button>`).join('');
+      else if (r.kind === 'many') {
+        const n = ui.picks.length, okN = n >= r.min && n <= r.max;
+        controls = `<span class="muted">${n} chosen (${r.min === r.max ? r.min : r.min + '–' + r.max})</span>
+          <button class="primary" data-confirm ${okN ? '' : 'disabled'}>Confirm</button>${n ? '<button data-clearpicks>Clear</button>' : ''}`;
+      } else if (r.kind === 'number') {
+        controls = `<div class="stepper"><button data-num="-1">−</button><b>${ui.num}</b><button data-num="1">+</button>
+          <button data-num="min">${r.min}</button><button data-num="max">${r.max}</button></div><button class="primary" data-numok>OK</button>`;
+      }
+      const hint = cardOpts.length ? (r.kind === 'many' ? 'Click cards to select them (glowing cards are choices), then Confirm.' : 'Click a glowing card to choose it.') : '';
+      return `<div class="decide"><div class="q">${online() ? '' : `<span class="who2">Player ${s.pending.player + 1}:</span> `}${esc(r.prompt)}</div>
+        ${hint ? `<div class="hint">${hint}</div>` : ''}
+        ${optCards ? `<div class="opts">${optCards}</div>` : ''}
+        <div class="row">${controls}</div></div>`;
+    }
+    if (s.phase !== 'action') return '';
     const p = s.turn;
-    if (!ui.reveal && ui.viewer !== p) return online() ? '<div class="pending">Waiting for opponent…</div>' : '';
+    if (!ui.reveal && me !== p) return `<div class="decide wait">${online() ? 'Opponent\'s turn — waiting for them to act…' : ''}</div>`;
     const la = s.lastAction;
     const clashNext = la && la.type === 'engage' && la.player !== p;
-    return `<div class="actions"><b>${online() ? 'Your turn' : `Player ${p + 1}`}, choose an action:</b> play a card from your hand, use a Feint in your combo, or Engage.
-      <div class="row">
-        <button data-engage="2">Engage: draw 2, discard 2</button>
-        <button data-engage="1">Engage: draw 1, discard 1</button>
-        <button data-engage="0">Engage: draw 0</button>
-        ${clashNext ? '<span class="turn" style="color:var(--accent)">Your opponent just engaged — engaging now starts the clash!</span>' : ''}
+    return `<div class="decide"><div class="q">${online() ? 'Your turn.' : `Player ${p + 1}'s turn.`} Click a card in your hand to play it, use a Feint, or Engage.</div>
+      <div class="engage">
+        <button data-engage="2">Engage · draw 2, discard 2</button>
+        <button data-engage="1">Engage · draw 1, discard 1</button>
+        <button data-engage="0">Engage · draw 0</button>
+        ${clashNext ? '<span class="warn" style="color:var(--accent);font-weight:700">⚔ Your opponent just engaged — engaging now starts the clash!</span>' : ''}
       </div></div>`;
   }
 
-  function debugHTML(s) {
+  function findCard(s, uid) {
+    for (const pl of s.players) for (const z of ['hand', 'combo', 'discard']) { const c = pl[z].find(x => x.uid === uid); if (c) return c; }
+    return null;
+  }
+
+  // ---------------------------------------------------------------- side panels
+  function inspectorHTML() {
+    const id = ui.pinned || ui.hover;
+    if (!id || !def(id)) return `<div class="inspector" id="inspector"><div class="muted small">Point at (or tap) any card or character to read it in full here.</div></div>`;
+    const d = def(id);
+    const big = d.kind === 'number' ? cardHTML({ uid: null, id, faceDown: false, owner: ui.viewer }) : '';
+    return `<div class="inspector ${ui.pinned ? 'pinned' : ''}" id="inspector"><button class="closebtn" data-unpin>✕</button>
+      <div class="big">${big}<div class="full"><div class="t">${esc(d.kind === 'number' ? `${d.color} ${d.number} ${d.name}` : `${d.name} — ${d.color} ${d.archetype}`)}</div>
+      ${esc(d.reading)}${d.text && d.text !== d.reading ? `<div class="orig">Printed: ${esc(d.text)}</div>` : ''}</div></div></div>`;
+  }
+
+  function logHTML(s, fresh) {
+    const viewer = ui.reveal ? 'all' : ui.viewer;
+    const all = Solo.logView(s, viewer);
+    const rows = all.slice(-500).map((e, i, arr) => ({ e, i: all.length - arr.length + i })).reverse().map(({ e, i }) =>
+      `<div class="${e.head ? 'head' : ''}${e.dbg ? ' dbg' : ''}${e.mine ? ' mine' : ''}${i >= fresh ? ' fresh' : ''}"${e.mine ? ' title="Only you can see this detail"' : ''}>${esc(e.text)}</div>`).join('');
+    return `<div class="logbox ${ui.logMin ? 'min' : ''}"><div class="logtitle">Game log <span class="muted small">newest first${viewer === 'all' ? ' · hidden details shown' : ''}</span><button data-logmin>${ui.logMin ? '▲' : '▼'}</button></div><div class="log" id="log">${rows}</div></div>`;
+  }
+
+  function debugHTML() {
     if (!ui.debug) return '';
     const cards = Solo.NUMBERS.map(c => `<option value="${c.id}">${c.color} ${c.number} ${esc(c.name)}${Solo.EFFECTS[c.id] ? '' : ' (not implemented)'}</option>`).join('');
     const chars = Solo.CHARACTERS.map(c => `<option value="${c.id}">${esc(c.name)} (${c.color})${Solo.EFFECTS[c.id] ? '' : ' (not implemented)'}</option>`).join('');
@@ -311,19 +422,55 @@
         <input id="dbgVal" type="number" value="10" style="width:70px"><button data-dbg="set">Set</button></div>
       <div class="row"><select id="dbgClearZone"><option value="hand">hand</option><option value="combo">combo</option><option value="discard">discard</option><option value="deck">deck</option></select><button data-dbg="clear">Clear zone</button></div>
       <div class="row"><button data-dbg="turn">Give turn to this player</button></div>
-      <p class="muted small">Choose a player above, then add cards, set stats or clear zones. Cards added to a combo don't trigger anything. Then play normally.</p>
+      <p class="muted small">Choose a player above, then add cards, set stats or clear zones. Cards added to a combo don't trigger anything.</p>
       <div class="row"><label><input type="checkbox" id="dbgReveal" ${ui.reveal ? 'checked' : ''}> show both hands / skip pass screen</label></div>
       <div class="row"><button data-export>Copy game record (JSON)</button></div>
     </div>`;
   }
 
-  // Action log, newest first. Built by the engine; each player only sees
-  // the text they're allowed to (opponents see "draws 2 cards", not names).
-  function logHTML(s) {
-    const viewer = ui.reveal ? 'all' : ui.viewer;
-    const rows = Solo.logView(s, viewer).slice(-500).reverse().map(e =>
-      `<div class="${e.head ? 'head' : ''}${e.dbg ? ' dbg' : ''}${e.mine ? ' mine' : ''}"${e.mine ? ' title="Only you can see this detail"' : ''}>${esc(e.text)}</div>`).join('');
-    return `<div class="logbox"><div class="logtitle">Game log <span class="muted small">newest first${viewer === 'all' ? ' · showing hidden details' : ''}</span></div><div class="log" id="log">${rows}</div></div>`;
+  // ---------------------------------------------------------------- overlays
+  function overlaysHTML(s, pi) {
+    let out = '';
+    if (ui.drawer !== null) {
+      const pl = s.players[ui.drawer];
+      out += `<div class="overlay" data-close><div class="modal"><h2>${pFull(ui.drawer)} — discard pile (${pl.discard.length})</h2>
+        <div class="cards">${pl.discard.map(c => cardHTML(c, { pi })).join('') || '<span class="empty">empty</span>'}</div>
+        <div class="row" style="margin-top:12px"><button data-close>Close</button></div></div></div>`;
+    } else if (s.phase === 'over' && !ui.overSeen) {
+      const me = ui.viewer;
+      const win = s.winner === 'draw' ? 'Draw!' : online() ? (s.winner === me ? 'You win!' : 'You lose') : `Player ${s.winner + 1} wins!`;
+      const cls = s.winner === 'draw' ? '' : online() ? (s.winner === me ? 'win' : 'lose') : 'win';
+      const last = Solo.logView(s, ui.reveal ? 'all' : me).filter(e => e.head).slice(-1)[0];
+      out += `<div class="overlay"><div class="modal"><div class="result ${cls}">${win}</div>
+        ${last ? `<p style="text-align:center">${esc(last.text)}</p>` : ''}
+        <div class="row" style="justify-content:center;display:flex;gap:8px"><button data-overok>See the board</button>
+        ${online() ? '<button class="primary" data-leave>Leave</button>' : '<button class="primary" data-new>New game</button>'}</div></div></div>`;
+    } else if (ui.clashAt !== null) out += clashHTML(s);
+    return out;
+  }
+
+  // Clash results, read from the log (so each player sees only what their log shows).
+  function clashHTML(s) {
+    const lines = Solo.logView(s, ui.reveal ? 'all' : ui.viewer);
+    const from = ui.clashAt;
+    let to = lines.length;
+    for (let i = from + 1; i < lines.length; i++) if (lines[i].head && /^Round \d+ begins/.test(lines[i].text)) { to = i; break; }
+    const part = lines.slice(from, to);
+    const tot = [0, 1].map(p => part.map(e => e.text.match(new RegExp(`^Player ${p + 1}: power (\\d+) \\+ combo (\\d+) \\((.*)\\) = (\\d+)\\.`))).find(Boolean));
+    const winLine = part.find(e => / wins the clash, | is a tie, /.test(e.text));
+    const winner = winLine && (winLine.text.match(/^Player (\d) wins/) || [])[1];
+    const side = p => {
+      const m = tot[p];
+      return `<div class="side2 ${winner == p + 1 ? 'win' : ''}"><div>${pFull(p)}</div><div class="tot">${m ? m[4] : '…'}</div>
+        <div class="brk">${m ? `power ${m[1]} + combo ${m[2]} (${esc(m[3])})` : ''}</div></div>`;
+    };
+    const waiting = s.pending && !myPending(s) ? '<p class="muted">Waiting for the other player to finish the reset…</p>' : '';
+    return `<div class="overlay"><div class="modal"><h2>⚔ ${esc(part[0] ? part[0].text : 'Clash!')}</h2>
+      <div class="clashsum">${side(0)}<div class="vsbig">VS</div>${side(1)}</div>
+      ${winLine ? `<div class="result" style="font-size:20px">${esc(winLine.text)}</div>` : ''}
+      <div class="clashlines">${part.slice(1).map(e => `<div class="${e.head ? 'head' : ''}">${esc(e.text)}</div>`).join('')}</div>
+      ${waiting}
+      <div class="row" style="margin-top:12px;display:flex"><button class="primary" data-clashok>${s.pending && myPending(s) ? 'Continue to the reset' : 'Continue'}</button></div></div></div>`;
   }
 
   // Online connection status: connected, reconnecting, or opponent disconnected.
@@ -364,57 +511,121 @@
       <div class="row"><button data-leave>Cancel</button></div></div>`;
   }
 
+  // ---------------------------------------------------------------- render
   function render() {
     if (!ui.mode) { renderSetup(); return; }
     if (online() && (!current() || (ui.mode === 'guest' && ui.online.session.status === 'rejected'))) { renderLobby(); return; }
     const s = current();
     if (ui.passTo !== null) {
       app.innerHTML = `<div class="pass"><div class="box"><div class="muted">Pass the device to</div>
-        <div class="who">Player ${ui.passTo + 1}</div>
+        <div class="who3">Player ${ui.passTo + 1}</div>
         <button class="primary" id="ready">I'm Player ${ui.passTo + 1} — show my cards</button></div></div>`;
-      document.getElementById('ready').onclick = () => { ui.viewer = ui.passTo; ui.passTo = null; render(); };
+      document.getElementById('ready').onclick = () => { ui.viewer = ui.passTo; ui.passTo = null; ui.snap = null; render(); };
       return;
     }
-    const top = ui.viewer === null ? 1 : 1 - ui.viewer;
-    const me = ui.viewer;
+    const me = ui.viewer === null ? 0 : ui.viewer, top = 1 - me;
+    const viewerKey = ui.reveal ? 'all' : ui.viewer;
+    const logLen = Solo.logView(s, viewerKey).length;
+    const gameKey = `${ui.mode}|${online() ? ui.online.code : s.seed}|${viewerKey}`;
+    const prev = ui.snap && ui.snap.key === gameKey ? ui.snap : null;
+    // Log lines are the same in every player's view (only their text differs), so
+    // "how much of the log was already on screen" survives the pass-the-device screen.
+    const logKey = gameKey.replace(/\|[^|]*$/, '');
+    const seen = ui.logSeen && ui.logSeen.key === logKey ? ui.logSeen.n : logLen;
+    const fresh = seen;
+    // A new clash in the log opens the results overlay.
+    if (logLen > seen) {
+      const lines = Solo.logView(s, viewerKey);
+      for (let i = seen; i < lines.length; i++) if (lines[i].head && /^Clash!/.test(lines[i].text)) ui.clashAt = i;
+    }
+    const myTurnNow = s.phase !== 'over' && Solo.actor(s) === ui.viewer;
+    if (prev && online() && myTurnNow && !prev.myTurn) ui.toast = s.pending ? 'Your choice' : 'Your turn';
+
+    const pi = promptInfo(s);
     const statusTurn = s.phase === 'over' ? 'Game over'
-      : !online() ? (s.pending ? `Waiting on Player ${s.pending.player + 1}'s choice` : `Player ${s.turn + 1}'s turn`)
-      : s.pending ? (s.pending.player === me ? 'Your choice' : 'Waiting for opponent…')
-      : s.turn === me ? 'Your turn' : 'Opponent\'s turn';
-    const winText = s.winner === 'draw' ? 'The game is a draw.'
-      : online() ? (s.winner === me ? 'You win!' : 'Your opponent wins.') : 'Player ' + (s.winner + 1) + ' wins!';
-    const winner = s.phase === 'over'
-      ? `<div class="over">${winText} ${online() ? '<button data-leave>Leave</button>' : '<button data-new>New game</button>'}</div>` : '';
-    const la = s.lastAction ? `Last action: Player ${s.lastAction.player + 1} ${s.lastAction.type === 'engage' ? 'engaged' : s.lastAction.type === 'play' ? 'played a card' : 'used a Feint'}` : '';
+      : !online() ? (s.pending ? `Player ${s.pending.player + 1} is choosing` : `Player ${s.turn + 1}'s turn`)
+      : s.pending ? (s.pending.player === ui.viewer ? 'Your choice' : 'Waiting for opponent…')
+      : s.turn === ui.viewer ? 'Your turn' : 'Opponent\'s turn';
+    const la = s.lastAction ? `Last: ${pName(s.lastAction.player)} ${s.lastAction.type === 'engage' ? 'engaged' : s.lastAction.type === 'play' ? 'played a card' : 'used a Feint'}` : '';
     const err = errorText();
-    app.innerHTML = `<div class="wrap">
-      <div class="status"><span class="turn">${statusTurn}</span><span>Round ${s.round}</span><span class="muted">${la}</span>
+    app.innerHTML = `<div class="wrap ${ui.logMin ? 'logmin' : ''}">
+      <div class="topbar"><span class="turn ${myTurnNow ? 'mine' : ''}">${statusTurn}</span><span>Round <b>${s.round}</b></span><span class="muted">${la}</span>
+        <span class="spacer"></span>
         ${online() ? connHTML() + '<button data-leave>Leave</button>' : `<span class="muted small">seed ${esc(s.seed)}</span><button data-new>New game</button>`}</div>
-      ${winner}
       ${err ? `<div class="error">${esc(err)}</div>` : ''}
-      <div class="layout"><div>
-        ${playerHTML(s, top)}
-        ${pendingHTML(s)}
-        ${actionsHTML(s)}
-        ${playerHTML(s, 1 - top)}
+      <div class="layout"><div class="arena">
+        ${stripHTML(s, top)}
+        ${ui.reveal ? handHTML(s, top, pi) : ''}
+        ${laneHTML(s, top, pi)}
+        ${laneHTML(s, me, pi)}
+        ${decideHTML(s, pi)}
+        ${stripHTML(s, me)}
+        ${handHTML(s, me, pi)}
       </div>
-      <div class="side">${debugHTML(s)}${logHTML(s)}</div>
-      </div></div>`;
+      <div class="side">${debugHTML()}${inspectorHTML()}${logHTML(s, fresh)}</div>
+      </div></div>
+      ${overlaysHTML(s, pi)}
+      ${ui.toast ? `<div class="toast">${esc(ui.toast)}</div>` : ''}`;
+    ui.toast = '';
     for (const id in ui.dbgKeep) {
       const e = document.getElementById(id);
       if (e) { if (e.type === 'checkbox') e.checked = ui.dbgKeep[id]; else e.value = ui.dbgKeep[id]; }
     }
+    highlightChanges(s, prev);
+    ui.snap = snapshot(s, gameKey, logLen, myTurnNow);
+    ui.logSeen = { key: logKey, n: logLen };
   }
   ui.render = render;
+
+  // What changed since the last render: cards entering a combo, flips, stat changes.
+  function snapshot(s, key, logLen, myTurn) {
+    const cards = {};
+    s.players.forEach((pl, p) => ['hand', 'combo', 'discard'].forEach(z => pl[z].forEach(c => { if (c.uid !== null) cards[c.uid] = `${p}${z}${c.faceDown ? 'd' : 'u'}`; })));
+    const stats = s.players.map(pl => ({ life: pl.life, energy: pl.energy, power: pl.power }));
+    return { key, cards, stats, logLen, myTurn };
+  }
+  function highlightChanges(s, prev) {
+    if (!prev) return;
+    app.querySelectorAll('.lane .card[data-uid]').forEach(el => {
+      const uid = el.dataset.uid;
+      if (!uid) return;
+      const now = prev.cards[uid], loc = el.closest('.lane') ? 'combo' : '';
+      if (!now || !now.includes(loc)) el.classList.add('enter');
+      else if (now.endsWith('u') && el.classList.contains('back')) el.classList.add('flipped');
+    });
+    s.players.forEach((pl, p) => ['life', 'energy', 'power'].forEach(k => {
+      const d = pl[k] - prev.stats[p][k];
+      if (!d) return;
+      const el = app.querySelector(`[data-stat="${p}-${k}"]`);
+      if (el) el.insertAdjacentHTML('beforeend', `<span class="float ${d > 0 ? 'up' : 'down'}">${d > 0 ? '+' : ''}${d}</span>`);
+    }));
+  }
+
   ui.dbgKeep = {};
   app.addEventListener('change', ev => {
     const e = ev.target;
     if (e.id && e.id.startsWith('dbg') && e.id !== 'dbgReveal') ui.dbgKeep[e.id] = e.type === 'checkbox' ? e.checked : e.value;
   });
 
+  // Inspector follows the mouse without re-rendering the board.
+  app.addEventListener('mouseover', ev => {
+    const el = ev.target.closest('[data-cid]');
+    const id = el ? el.dataset.cid : null;
+    if (!id || id === ui.hover || ui.pinned) return;
+    ui.hover = id;
+    const box = document.getElementById('inspector');
+    if (box) box.outerHTML = inspectorHTML();
+  });
+
   // ---------------------------------------------------------------- events
+  app.addEventListener('dblclick', ev => {
+    const el = ev.target.closest('.hand .card.playable[data-uid]');
+    const s = current();
+    if (el && s && canAct(s, ui.viewer)) dispatch({ type: 'play', player: ui.viewer, uid: +el.dataset.uid });
+  });
+
   app.addEventListener('click', ev => {
-    const t = ev.target.closest('button, input[type=checkbox]');
+    const t = ev.target.closest('button, input[type=checkbox], .card[data-uid], .who[data-cid], .overlay');
     if (!t || !ui.mode) return;
     if (t.dataset.leave !== undefined) {
       const over = !current() || current().phase === 'over';
@@ -429,30 +640,62 @@
     }
     const s = current();
     if (!s) return;
-    if (t.dataset.act === 'play') dispatch({ type: 'play', player: s.turn, uid: +t.dataset.uid });
-    else if (t.dataset.act === 'feint') dispatch({ type: 'feint', player: s.turn, uid: +t.dataset.uid });
-    else if (t.dataset.engage !== undefined) dispatch({ type: 'engage', player: s.turn, count: +t.dataset.engage });
-    else if (t.dataset.choose !== undefined) dispatch({ type: 'choose', player: s.pending.player, value: s.pending.request.options[+t.dataset.choose].value });
-    else if (t.dataset.chooseMany !== undefined) {
-      const vals = [...app.querySelectorAll('[data-many]')].filter(x => x.checked).map(x => s.pending.request.options[+x.dataset.many].value);
-      dispatch({ type: 'choose', player: s.pending.player, value: vals });
-    } else if (t.dataset.chooseNum !== undefined) dispatch({ type: 'choose', player: s.pending.player, value: +document.getElementById('numpick').value });
-    else if (t.dataset.toggleDiscard !== undefined) { ui.showDiscard[+t.dataset.toggleDiscard] = !ui.showDiscard[+t.dataset.toggleDiscard]; render(); }
-    else if (t.dataset.new !== undefined) { if (confirm('Start a new game?')) { ui.game = null; ui.mode = null; render(); } }
+    const pi = promptInfo(s);
+    const choose = value => dispatch({ type: 'choose', player: s.pending.player, value });
+    const d = t.dataset;
+
+    if (t.classList.contains('overlay')) { if (d.close !== undefined && ev.target === t) { ui.drawer = null; render(); } return; }
+    if (d.close !== undefined) { ui.drawer = null; render(); return; }
+    if (d.clashok !== undefined) { ui.clashAt = null; render(); return; }
+    if (d.overok !== undefined) { ui.overSeen = true; render(); return; }
+    if (d.discard !== undefined) { ui.drawer = +d.discard; render(); return; }
+    if (d.unpin !== undefined) { ui.pinned = null; render(); return; }
+    if (d.logmin !== undefined) { ui.logMin = !ui.logMin; render(); return; }
+    if (t.classList.contains('who')) { ui.pinned = ui.pinned === d.cid ? null : d.cid; render(); return; }
+
+    // Clicking a card: answer a prompt, select a hand card, or read it.
+    if (t.classList.contains('card')) {
+      const uid = d.uid === '' ? null : +d.uid;
+      if (pi && uid !== null && pi.values.has(uid)) {
+        if (pi.r.kind === 'one') { ui.drawer = null; choose(uid); return; }
+        ui.picks = ui.picks.includes(uid) ? ui.picks.filter(x => x !== uid) : ui.picks.concat([uid]);
+        render(); return;
+      }
+      if (uid !== null && canAct(s, ui.viewer) && s.players[ui.viewer].hand.some(c => c.uid === uid)) {
+        ui.sel = ui.sel === uid ? null : uid;
+        ui.pinned = null; ui.hover = d.cid || ui.hover;
+        render(); return;
+      }
+      if (d.cid) { ui.pinned = ui.pinned === d.cid ? null : d.cid; render(); }
+      return;
+    }
+
+    if (d.play !== undefined) dispatch({ type: 'play', player: s.turn, uid: +d.play });
+    else if (d.feint !== undefined) dispatch({ type: 'feint', player: s.turn, uid: +d.feint });
+    else if (d.engage !== undefined) dispatch({ type: 'engage', player: s.turn, count: +d.engage });
+    else if (d.opt !== undefined && pi) choose(pi.r.options[+d.opt].value);
+    else if (d.confirm !== undefined && pi) { ui.drawer = null; choose(ui.picks.slice()); }
+    else if (d.clearpicks !== undefined) { ui.picks = []; render(); }
+    else if (d.num !== undefined && pi) {
+      const r = pi.r;
+      ui.num = d.num === 'min' ? r.min : d.num === 'max' ? r.max : Math.max(r.min, Math.min(r.max, ui.num + +d.num));
+      render();
+    } else if (d.numok !== undefined && pi) choose(ui.num);
+    else if (d.new !== undefined) { if (s.phase === 'over' || confirm('Start a new game?')) { ui.game = null; ui.mode = null; render(); } }
     else if (!ui.debug) return;
-    else if (t.dataset.export !== undefined) {
+    else if (d.export !== undefined) {
       const rec = JSON.stringify({ config: ui.game.config, actions: ui.game.actions });
       (navigator.clipboard ? navigator.clipboard.writeText(rec) : Promise.reject()).then(() => alert('Game record copied.'), () => prompt('Game record:', rec));
-    } else if (t.id === 'dbgReveal') { ui.reveal = t.checked; if (ui.reveal) ui.viewer = Solo.actor(s); render(); }
-    else if (t.dataset.dbg) {
+    } else if (t.id === 'dbgReveal') { ui.reveal = t.checked; if (ui.reveal) ui.viewer = Solo.actor(s); ui.snap = null; render(); }
+    else if (d.dbg) {
       const p = +document.getElementById('dbgP').value;
-      const op = t.dataset.dbg;
+      const op = d.dbg;
       if (op === 'add') dispatch({ type: 'debug', op, player: p, cardId: document.getElementById('dbgCard').value, zone: document.getElementById('dbgZone').value, faceDown: document.getElementById('dbgDown').checked });
       else if (op === 'character') dispatch({ type: 'debug', op, player: p, cardId: document.getElementById('dbgChar').value });
       else if (op === 'set') dispatch({ type: 'debug', op, player: p, stat: document.getElementById('dbgStat').value, value: +document.getElementById('dbgVal').value });
       else if (op === 'turn') dispatch({ type: 'debug', op, player: p });
       else if (op === 'clear') dispatch({ type: 'debug', op, player: p, zone: document.getElementById('dbgClearZone').value });
-      else if (op === 'flip' || op === 'remove') dispatch({ type: 'debug', op, player: p, uid: +t.dataset.uid });
+      else if (op === 'flip' || op === 'remove') dispatch({ type: 'debug', op, player: p, uid: +d.uid });
     }
   });
 

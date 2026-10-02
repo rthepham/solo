@@ -161,6 +161,7 @@
         }));
       });
       if (m.view.pending && m.view.pending.player === 0) ok(!m.view.pending.request, 'host prompt not sent to guest');
+      ok(!JSON.stringify(m).includes('online-fields'), 'the secret seed never appears in a message (log included)');
     });
   });
 

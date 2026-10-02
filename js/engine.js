@@ -128,7 +128,8 @@
       pl.deck = pc.deck.map(id => makeCard(s, id, p));
     });
     s.players.forEach(pl => RNG.shuffle(s, pl.deck));
-    log(s, `New game, seed "${s.seed}".`);
+    // The seed is not logged: online, it is the host's secret (it would reveal both decks).
+    log(s, 'New game.');
     return s;
   }
 
@@ -185,7 +186,7 @@
   function chooseCard(s, player, prompt, cards, opts = {}) {
     if (!cards.length) return null;
     if (!opts.optional && cards.length === 1) return cards[0];
-    const options = cards.map(c => ({ value: c.uid, label: label(s, c, player) + locText(s, c) }));
+    const options = cards.map(c => cardOption(s, c, player));
     if (opts.optional) options.push({ value: null, label: opts.noneLabel || 'None' });
     const uid = ask(s, player, { prompt, kind: 'one', options });
     return uid === null ? null : cards.find(c => c.uid === uid);
@@ -196,10 +197,16 @@
     min = Math.min(min, max);
     if (!cards.length || max === 0) return [];
     if (min === max && max === cards.length && !validate) return cards.slice();
-    const options = cards.map(c => ({ value: c.uid, label: label(s, c, player) + locText(s, c) }));
+    const options = cards.map(c => cardOption(s, c, player));
     const uids = ask(s, player, { prompt, kind: 'many', options, min, max },
       validate ? (a => validate(a.map(u => cards.find(c => c.uid === u)))) : null);
     return uids.map(u => cards.find(c => c.uid === u));
+  }
+
+  // A card option: its uid, a text label, and (only if the chooser may see it) the card id, for drawing it.
+  function cardOption(s, c, player) {
+    const seen = !c.faceDown || c.owner === player;
+    return { value: c.uid, label: label(s, c, player) + locText(s, c), card: seen ? c.id : null, faceDown: !!c.faceDown };
   }
 
   function chooseNumber(s, player, prompt, min, max) {
@@ -968,7 +975,7 @@
   Solo.apply = apply;
   Solo.replay = replay;
   // Online players must run the same rules: bump this whenever rules, cards or the protocol change.
-  Solo.VERSION = 'solo-2026.10.01-1';
+  Solo.VERSION = 'solo-2026.10.01-2';
   Solo.actor = actor;
   Solo.logView = logView;
   Solo.logText = entryText;

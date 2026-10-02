@@ -23,6 +23,9 @@ Automated (`tests/online.test.js`, 11 tests, in `tests.html` and `node tools/run
 - Version mismatch is refused in both directions with a clear message. A third player is refused. The guest can't move as Player 1 or use debug actions (nor can the host, online).
 - Guest drop and rejoin (same session, and a fresh page with the saved token). Host restore from the saved record gives a byte-identical state, and the guest can reconnect to it.
 
+## Fixed after Stage 2
+- **The secret seed was in the log.** The engine's first log line was `New game, seed "…"`, so the guest received the host's seed (which would let them recompute both decks). Found while reviewing the new UI; the line is now just "New game." and the online field test now also checks that the seed never appears in any message to the guest. The original Stage 2 tests didn't look inside log text for the seed, which is how it slipped through.
+
 ## Not tested
 
 - **Two different computers on different networks.** I could only test two tabs on one machine. Connecting across the internet is exactly what WebRTC sometimes fails at (see limits). This is the biggest gap. Please try it before relying on it.

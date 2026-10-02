@@ -93,3 +93,12 @@ Choices made while building the game where the rulebook, `readings.md` and `ruli
 - **No pass-the-device screen online**; each screen is one player's.
 - **PeerJS** 1.5.4 is loaded from unpkg.com only when you click Host or Join, so hotseat still works offline by double-clicking `index.html`.
 - **Known, accepted limit**: the host's browser holds the full game state (both hands, deck order). A host who opens the developer tools can see everything. The guest can't.
+
+## UI overhaul
+- **Arena layout.** Opponent strip (character, life/energy/power/clash-total bars, hand as card backs, deck and discard piles) at the top, then the opponent's combo, your combo, the decision bar, your strip and your hand. The bottom is always "you" (in hotseat, whoever holds the device).
+- **Cards** are larger tiles: big number, move and family, name, and the reading. Combo cards show their *current* value in a badge when it differs from the printed number (face-down, Noct Umbra, Death Finisher). Face-down cards you're allowed to see show their name in small text. The panel on the right shows the full reading and the printed text of whatever card or character the mouse is over (tap on phones).
+- **Choosing by clicking cards.** Card choices glow on the board; click one (or several, then Confirm). Choices that aren't on the board (discard pile, top of deck) are drawn inside the decision bar. To draw them, card options now carry the card id, but **only when the chooser may see that card**. Yes/No/None/Done stay buttons; number choices use a stepper.
+- **Playing a card**: click it in your hand to raise it, then **Play · cost** (or double-click). Unplayable cards are dimmed and say why when clicked.
+- **Feedback**: cards that just entered a combo pop in; flips animate; life/energy/power changes float as +N/−N; new log lines are highlighted; a "Your turn" toast appears online. Each clash opens a results window built from the log (so it shows exactly what that player's log shows): both totals with the power + combo breakdown, the winner, the damage and every effect. Game over gets its own window.
+- **No sound** for now: it would need audio files or synthesis and wasn't asked for directly.
+- **The seed is no longer logged** (it was the online host's secret). Hotseat still shows the seed in the top bar.

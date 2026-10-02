@@ -6,6 +6,8 @@ Built only from the designer's rulebook and card spreadsheet (`source/`), `readi
 Double-click `index.html`. Pick a seed, a character and a deck style for each player, then **Start game**. Hand the device over when the "Pass the device" screen appears.
 Tick **Debug mode** on the setup screen for the card/stat editor (both hands visible, no pass screen).
 
+**How to play on screen:** your opponent is at the top, you're at the bottom, and the two combos face each other in the middle with each side's clash total. Click a card in your hand to pick it up, then **Play** (or double-click it). Glowing cards are the choices for the current question: click one, or several then **Confirm**. Purple-edged combo cards have a **Feint** button. Point at any card (or tap it on a phone) to read it in full in the panel on the right. Each clash opens a results window with both totals, the winner and the damage.
+
 The **Game log** (right side, or the bottom of the screen on a phone) shows what just happened and why, newest first. Each player only sees their own hidden cards named (lines in blue are details only you can see).
 
 ## Play online (two computers)
