@@ -220,7 +220,7 @@
     return `
       <div class="row"><input id="dbname" value="${esc(d.name)}" maxlength="40" style="flex:1;font-weight:700"></div>
       <div class="row"><select id="dbchar" style="flex:1">${charOptions(d.character)}</select></div>
-      ${ch ? `<div class="muted small" style="margin-bottom:8px">${esc(ch.reading)}</div>` : ''}
+      ${ch ? `<div class="small" style="margin-bottom:8px">${faceHTML(ch)}</div>` : ''}
       <div class="dbcount ${total === 40 ? 'ok' : ''}"><b>${total}</b> / 40 cards<div class="meter"><i style="width:${Math.min(100, total / 40 * 100)}%"></i></div></div>
       ${byColor.length ? `<div class="colorbar">${byColor.map(([c, n]) => `<i style="flex:${n};background:${COLOR_VAR[c]}" title="${c}: ${n}"></i>`).join('')}</div>` : ''}
       <div class="curve" title="Cards by number">${curve.map((n, i) => `<div><i style="height:${n / maxC * 100}%"></i><span>${i + 1}</span><b>${n || ''}</b></div>`).join('')}</div>
@@ -414,7 +414,11 @@
   // ---------------------------------------------------------------- helpers
   const def = id => Solo.DATA[id];
   // Card face text: the reading without my interpretation notes ([UNCLEAR] ..., [RULING]); those go in the inspector.
-  const faceText = d => d.reading.replace(/\s*\[UNCLEAR\][\s\S]*$/, '').replace(/\s*\[RULING\]/g, '');
+  // Full rules reading without my interpretation notes; the notes are shown separately.
+  const rulesText = d => d.reading.replace(/\s*\[UNCLEAR\][\s\S]*$/, '').replace(/\s*\[RULING\]/g, '');
+  // Short card text (js/card-text.js) as HTML, with the ability keywords in bold.
+  const KW = new RegExp('(^|\\. )(' + Solo.CARD_KEYWORDS.join('|') + ')(?=[:.])', 'g');
+  const faceHTML = d => esc((Solo.CARD_TEXT || {})[d.id] || rulesText(d)).replace(KW, '$1<b>$2</b>');
   const noteText = d => { const m = d.reading.match(/\[UNCLEAR\]\s*([\s\S]*)$/); return m ? m[1] : ''; };
   const canSee = c => !c.hidden && c.id && (!c.faceDown || ui.reveal || c.owner === ui.viewer);
   const pName = p => online() ? (p === ui.viewer ? 'You' : 'Opponent') : `Player ${p + 1}`;
@@ -454,7 +458,7 @@
     return `<div class="card ${d.color} ${cls} ${c.silenced ? 'silenced' : ''}" data-uid="${uid}" data-cid="${c.id}">
       ${c.silenced ? '<span class="tag">no abilities</span>' : ''}
       <div class="top"><div class="n">${d.number}</div><div class="nm">${esc(d.name)}</div></div>
-      <div class="tx">${esc(faceText(d))}</div>
+      <div class="tx">${faceHTML(d)}</div>
       ${o.buttons ? `<div class="btns">${o.buttons}</div>` : ''}
       ${showVal ? `<div class="val" title="current value">${val}</div>` : ''}</div>`;
   }
@@ -587,7 +591,7 @@
     const big = d.kind === 'number' ? cardHTML({ uid: null, id, faceDown: false, owner: ui.viewer }) : '';
     return `<div class="inspector ${ui.pinned ? 'pinned' : ''}" id="inspector"><button class="closebtn" data-unpin>✕</button>
       <div class="big">${big}<div class="full"><div class="t">${esc(d.kind === 'number' ? `${d.color} ${d.number} ${d.name}` : `${d.name} — ${d.color} ${d.archetype}`)}</div>
-      ${esc(d.kind === 'number' ? faceText(d) : d.reading)}${d.kind === 'number' && noteText(d) ? `<div class="orig">Rules note: ${esc(noteText(d))}</div>` : ''}${d.text && d.text !== d.reading ? `<div class="orig">Printed: ${esc(d.text)}</div>` : ''}</div></div></div>`;
+      <div class="short">${faceHTML(d)}</div><div class="rules"><b>Full rules:</b> ${esc(rulesText(d))}</div>${noteText(d) ? `<div class="orig">Rules note: ${esc(noteText(d))}</div>` : ''}${d.text && d.text !== d.reading ? `<div class="orig">Printed: ${esc(d.text)}</div>` : ''}</div></div></div>`;
   }
 
   function logHTML(s, fresh) {
