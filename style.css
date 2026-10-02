@@ -212,3 +212,53 @@ button.pile { padding: 0; background: #262b36; }
   .lane .card { --cw: 74px; --ch: 96px; }
   .lane .lanelbl { display: none; }
 }
+
+/* ------------------------------------------------------------ deck builder */
+.builder .topbar .tabs { margin: 0; }
+.dblayout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; align-items: start; }
+.dbf { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--panel); border-radius: 10px; padding: 10px; margin-bottom: 10px; }
+.dbf #dbtext { flex: 1; min-width: 180px; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { padding: 3px 9px; font-size: 12px; border-radius: 14px; }
+.chip[style] { border-left: 6px solid var(--chip); }
+.chip.on { background: var(--accent); color: #111; border-color: var(--accent); font-weight: 700; }
+.dbgrid { gap: 10px; align-items: stretch; }
+.dbcard { cursor: pointer; }
+.dbcard:hover { transform: translateY(-3px); }
+.dbcard.indeck { border-color: #fff; box-shadow: 0 0 0 2px #ffffffaa, 0 3px 8px #0006; }
+.dbcard.n2 { opacity: .75; }
+.dbcard .btns { align-items: center; justify-content: space-between; background: #0004; border-radius: 6px; padding: 2px; }
+.dbcard .btns button { min-width: 30px; font-size: 15px; padding: 0 6px; }
+.dbcard .cnt { font-weight: 800; font-size: 12px; }
+.dbpanel { background: var(--panel); border-radius: 12px; padding: 12px; position: sticky; top: 10px; max-height: calc(100vh - 20px); overflow-y: auto; }
+.dbpanel .row { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.dbcount { font-size: 14px; margin: 4px 0 8px; }
+.dbcount b { font-size: 22px; }
+.dbcount.ok b { color: var(--ok); }
+.dbcount .meter { height: 6px; background: #0005; border-radius: 4px; overflow: hidden; margin-top: 3px; }
+.dbcount .meter i { display: block; height: 100%; background: var(--accent); }
+.dbcount.ok .meter i { background: var(--ok); }
+.colorbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+.curve { display: grid; grid-template-columns: repeat(9, 1fr); gap: 3px; height: 64px; align-items: end; margin-bottom: 10px; }
+.curve div { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+.curve i { display: block; width: 100%; background: var(--info); border-radius: 3px 3px 0 0; min-height: 1px; }
+.curve span { font-size: 10px; color: var(--muted); }
+.curve b { position: absolute; top: 0; font-size: 10px; }
+.dblist { max-height: 40vh; overflow-y: auto; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 4px 0; }
+.dbrow { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 13px; }
+.dbrow .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.dbrow .nn { font-weight: 800; width: 14px; text-align: right; }
+.dbrow .nm2 { flex: 1; }
+.dbrow .x { color: var(--muted); }
+.dbrow button { padding: 0 7px; font-size: 13px; }
+.dberr { color: #ffb3b5; font-size: 12.5px; margin: 8px 0; }
+.dbok { color: var(--ok); font-weight: 700; margin: 8px 0; }
+.dbmsg { background: var(--panel2); border-radius: 8px; padding: 6px 8px; font-size: 12.5px; margin: 6px 0; word-break: break-all; }
+.dbsaved { display: flex; flex-direction: column; gap: 4px; }
+.dbsaved button { text-align: left; }
+.dbsaved button.on { border-color: var(--accent); }
+@media (max-width: 1050px) {
+  .dblayout { grid-template-columns: 1fr; }
+  .dbpanel { position: static; max-height: none; order: -1; }
+  .dblist { max-height: 30vh; }
+}

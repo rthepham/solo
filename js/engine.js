@@ -975,7 +975,7 @@
   Solo.apply = apply;
   Solo.replay = replay;
   // Online players must run the same rules: bump this whenever rules, cards or the protocol change.
-  Solo.VERSION = 'solo-2026.10.01-2';
+  Solo.VERSION = 'solo-2026.10.01-3';
   Solo.actor = actor;
   Solo.logView = logView;
   Solo.logText = entryText;

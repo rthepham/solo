@@ -102,3 +102,10 @@ Choices made while building the game where the rulebook, `readings.md` and `ruli
 - **Feedback**: cards that just entered a combo pop in; flips animate; life/energy/power changes float as +N/−N; new log lines are highlighted; a "Your turn" toast appears online. Each clash opens a results window built from the log (so it shows exactly what that player's log shows): both totals with the power + combo breakdown, the winner, the damage and every effect. Game over gets its own window.
 - **No sound** for now: it would need audio files or synthesis and wasn't asked for directly.
 - **The seed is no longer logged** (it was the online host's secret). Hotseat still shows the seed in the top bar.
+
+## Deck builder
+- **Rules** (rulebook "Deck Building"): one character, exactly 40 numbered cards, at most 2 copies of each card. There is no color rule, so any colors can be mixed. `Solo.Decks.validate` in `js/decks.js` is the single check, used by the builder, the deck pickers and the online host.
+- **Saved decks** live in this browser's localStorage (`solo-decks`). Unfinished decks can be saved as drafts; the deck pickers show them greyed out until they're legal.
+- **Share codes**: `S1-` + base64url of 28 bytes (character index, then each card's 0–2 copies packed five cards per byte in base 3), plus an optional `.` + the name in UTF-8 base64url. Card order is the sorted card ids; if the card list ever changes, the code version must change (`S2-`). Codes are about 40 characters and safe to paste in chat or URLs.
+- **Online**: a player with a built deck sends its 40 card ids in `hello`; the host checks them with the same rules and refuses an illegal deck with the reason ("The host refused your deck: …"). The host's own deck works the same way. Built decks are shuffled with the secret seed before cards get ids, like random decks. The host learns the guest's deck list (it already holds the full game state); the guest never learns the host's. The online version is now `solo-2026.10.01-3`.
+- **Not added**: a "fill the rest randomly" button and per-player deck stats beyond count, color mix and the number curve.

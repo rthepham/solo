@@ -51,12 +51,39 @@
   // ---------------------------------------------------------------- setup
   function playableChars() { return Solo.CHARACTERS.filter(c => Solo.EFFECTS[c.id]); }
   const charOptions = sel => playableChars().map(c => `<option value="${c.id}" ${c.id === sel ? 'selected' : ''}>${esc(c.name)} (${c.color}, ${esc(c.archetype)})</option>`).join('');
-  const styleOptions = '<option value="mono">Deck: character\'s color</option><option value="mixed">Deck: all colors</option>';
+
+  // Saved decks live in this browser: [{ id, name, character, cards: { id: copies }, updated }].
+  const loadDecks = () => store.get('localStorage', 'solo-decks') || [];
+  const saveDecks = list => store.set('localStorage', 'solo-decks', list);
+  const deckLegal = d => Solo.Decks.validate(d).length === 0;
+
+  // One "Deck" picker: a saved deck, or a random deck for a chosen character.
+  function deckPickerHTML(prefix, defChar) {
+    const decks = loadDecks();
+    const sel = store.get('localStorage', 'solo-pick-' + prefix) || 'random-mono';
+    const opt = (v, label, dis) => `<option value="${v}" ${v === sel ? 'selected' : ''} ${dis ? 'disabled' : ''}>${esc(label)}</option>`;
+    return `<select id="${prefix}deck" data-deckpick="${prefix}">
+        ${opt('random-mono', 'Random deck: character\'s color')}${opt('random-mixed', 'Random deck: all colors')}
+        ${decks.length ? `<optgroup label="Your decks">${decks.map(d => opt('deck:' + d.id, `${d.name} — ${Solo.DATA[d.character] ? Solo.DATA[d.character].name : '?'}${deckLegal(d) ? '' : ' (not finished)'}`, !deckLegal(d))).join('')}</optgroup>` : ''}
+      </select>
+      <select id="${prefix}char" ${sel.startsWith('deck:') ? 'style="display:none"' : ''}>${charOptions(defChar)}</select>`;
+  }
+  // What a picker means: { character, style } or { character, deck: [40 ids], name }.
+  function pickedChoice(prefix) {
+    const v = document.getElementById(prefix + 'deck').value;
+    store.set('localStorage', 'solo-pick-' + prefix, v);
+    if (v.startsWith('deck:')) {
+      const d = loadDecks().find(x => 'deck:' + x.id === v);
+      if (d && deckLegal(d)) return { character: d.character, deck: Solo.Decks.toList(d.cards), name: d.name };
+    }
+    return { character: document.getElementById(prefix + 'char').value, style: v === 'random-mixed' ? 'mixed' : 'mono' };
+  }
 
   function renderSetup() {
     const chars = playableChars();
     const seed = 'solo-' + Math.floor(Math.random() * 1e6);
     const tab = ui.setupTab;
+    if (tab === 'decks') { renderDeckBuilder(); return; }
     const last = store.get('localStorage', 'solo-last-host');
     const lastRec = last && store.get('localStorage', 'solo-host-' + last);
     const lastState = lastRec && lastRec.record.config ? `room ${esc(last)}` : '';
@@ -64,20 +91,16 @@
       <div class="setup">
         <h1>Solo — The Card Game</h1>
         <p class="muted">Reduce your opponent's life to 0, or have the most life when a deck runs out.</p>
-        <div class="tabs"><button class="${tab === 'hotseat' ? 'on' : ''}" data-tab="hotseat">Hotseat (one screen)</button><button class="${tab === 'online' ? 'on' : ''}" data-tab="online">Online (two computers)</button></div>
+        ${tabsHTML(tab)}
         ${ui.online && ui.online.notice ? `<div class="error">${esc(ui.online.notice)}</div>` : ''}
         ${tab === 'hotseat' ? `
         <div class="row"><label>Seed</label><input id="seed" value="${seed}" size="24"></div>
-        ${[0, 1].map(p => `
-          <div class="row"><label>Player ${p + 1}</label>
-            <select id="char${p}">${charOptions(chars[p % chars.length].id)}</select>
-            <select id="style${p}">${styleOptions}</select>
-          </div>`).join('')}
+        ${[0, 1].map(p => `<div class="row"><label>Player ${p + 1}</label>${deckPickerHTML('p' + p, chars[p % chars.length].id)}</div>`).join('')}
         <div class="row"><label>Debug mode</label><input type="checkbox" id="debug"> <span class="muted small">Card/stat editor, both hands visible, no pass screen</span></div>
         <div class="row"><button class="primary" id="start">Start game</button></div>
-        <p class="muted small">Decks: 40 cards, 20 different cards &times; 2, picked from the seed. The same seed and moves always replay the same game.</p>
+        <p class="muted small">Build your own decks in the <b>Decks</b> tab. Random decks are 20 different cards &times; 2, picked from the seed; the same seed and moves always replay the same game.</p>
         ` : `
-        <div class="row"><label>Your character</label><select id="ochar">${charOptions(chars[0].id)}</select><select id="ostyle">${styleOptions}</select></div>
+        <div class="row"><label>Your deck</label>${deckPickerHTML('o', chars[0].id)}</div>
         <div class="box2">
           <h2>Host a game</h2>
           <p class="muted small">You get a short room code. Send it to your friend. Your browser runs the game, so keep this page open.</p>
@@ -91,29 +114,196 @@
         <p class="muted small">Online play connects the two browsers directly (PeerJS, loaded from unpkg.com). Debug mode is off online.</p>
         `}
       </div>`;
-    app.querySelectorAll('[data-tab]').forEach(b => { b.onclick = () => { ui.setupTab = b.dataset.tab; if (ui.online) ui.online.notice = ''; render(); }; });
+    bindTabs();
+    app.querySelectorAll('[data-deckpick]').forEach(s => {
+      s.onchange = () => { document.getElementById(s.dataset.deckpick + 'char').style.display = s.value.startsWith('deck:') ? 'none' : ''; };
+    });
     if (tab === 'hotseat') {
       document.getElementById('start').onclick = () => {
         const seedV = document.getElementById('seed').value || 'solo';
         const players = [0, 1].map(p => {
-          const character = document.getElementById('char' + p).value;
-          return { character, deck: Solo.buildDeck(seedV + '#' + p, character, document.getElementById('style' + p).value) };
+          const c = pickedChoice('p' + p);
+          return { character: c.character, deck: c.deck || Solo.buildDeck(seedV + '#' + p, c.character, c.style) };
         });
         ui.debug = document.getElementById('debug').checked;
         ui.reveal = ui.debug;
         startGame({ seed: seedV, players });
       };
     } else {
-      const choice = () => ({ character: document.getElementById('ochar').value, style: document.getElementById('ostyle').value });
-      document.getElementById('host').onclick = () => startHost({ choice: choice() });
+      document.getElementById('host').onclick = () => startHost({ choice: pickedChoice('o') });
       const r = document.getElementById('resume');
       if (r) r.onclick = () => startHost({ code: last, record: lastRec.record });
       document.getElementById('join').onclick = () => {
         const code = document.getElementById('code').value.trim().toUpperCase();
         if (!/^[A-Z0-9]{5}$/.test(code)) { ui.joinCode = code; ui.online = { notice: 'Room codes are 5 letters/numbers.' }; render(); return; }
-        startGuest(code, choice());
+        startGuest(code, pickedChoice('o'));
       };
     }
+  }
+
+  const tabsHTML = tab => `<div class="tabs">${[['hotseat', 'Hotseat (one screen)'], ['online', 'Online (two computers)'], ['decks', 'Decks']]
+    .map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-tab="${k}">${l}</button>`).join('')}</div>`;
+  function bindTabs() {
+    app.querySelectorAll('[data-tab]').forEach(b => {
+      b.onclick = () => {
+        if (ui.setupTab === 'decks' && ui.db && ui.db.dirty && !confirm('Leave the deck builder without saving your changes?')) return;
+        ui.setupTab = b.dataset.tab; if (ui.online) ui.online.notice = ''; render();
+      };
+    });
+  }
+
+  // ---------------------------------------------------------------- deck builder
+  const COLORS = Solo.COLORS;
+  const FAMILIES = [...new Set(Solo.NUMBERS.map(c => c.name.split(' ')[0]))];
+  const newDeck = () => ({ id: null, name: 'New deck', character: playableChars()[0].id, cards: {} });
+  function dbState() {
+    if (!ui.db) ui.db = { deck: newDeck(), dirty: false, msg: '', f: { colors: [], nums: [], family: '', text: '', inDeck: false } };
+    return ui.db;
+  }
+
+  function renderDeckBuilder() {
+    const db = dbState();
+    app.innerHTML = `<div class="wrap builder">
+      <div class="topbar"><b style="font-size:18px">Deck builder</b><span class="spacer"></span>${tabsHTML('decks')}</div>
+      <div class="dblayout">
+        <div><div id="dbfilters">${dbFiltersHTML(db)}</div><div id="dbgrid" class="cards dbgrid"></div></div>
+        <div id="dbpanel" class="dbpanel"></div>
+      </div></div>`;
+    bindTabs();
+    dbRefresh();
+  }
+  // Redraws the card grid and the deck panel (not the filters, so typing in search keeps focus).
+  function dbRefresh() {
+    const db = dbState();
+    const grid = document.getElementById('dbgrid'), panel = document.getElementById('dbpanel');
+    if (grid) grid.innerHTML = dbGridHTML(db);
+    if (panel) panel.innerHTML = dbPanelHTML(db);
+  }
+
+  function dbFiltersHTML(db) {
+    const f = db.f;
+    const chip = (kind, v, label, on, style) => `<button class="chip ${on ? 'on' : ''}" data-dbf="${kind}" data-v="${v}" ${style ? `style="${style}"` : ''}>${label}</button>`;
+    return `<div class="dbf">
+      <input id="dbtext" placeholder="Search name or text…" value="${esc(f.text)}">
+      <div class="chips">${COLORS.map(c => chip('color', c, c, f.colors.includes(c), `--chip:${COLOR_VAR[c]}`)).join('')}</div>
+      <div class="chips">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => chip('num', n, n, f.nums.includes(n))).join('')}</div>
+      <select id="dbfamily"><option value="">All families</option>${FAMILIES.map(x => `<option ${x === f.family ? 'selected' : ''}>${x}</option>`).join('')}</select>
+      <label class="muted small"><input type="checkbox" id="dbindeck" ${f.inDeck ? 'checked' : ''}> only cards in my deck</label>
+      ${f.colors.length || f.nums.length || f.family || f.text || f.inDeck ? '<button data-dbclear>Clear filters</button>' : ''}
+    </div>`;
+  }
+
+  function dbGridHTML(db) {
+    const f = db.f, cards = db.deck.cards, text = f.text.trim().toLowerCase();
+    const list = Solo.NUMBERS.filter(c => Solo.EFFECTS[c.id] &&
+      (!f.colors.length || f.colors.includes(c.color)) && (!f.nums.length || f.nums.includes(c.number)) &&
+      (!f.family || c.name.startsWith(f.family + ' ')) && (!f.inDeck || cards[c.id]) &&
+      (!text || (c.name + ' ' + c.reading + ' ' + c.color).toLowerCase().includes(text)))
+      .sort((a, b) => COLORS.indexOf(a.color) - COLORS.indexOf(b.color) || a.number - b.number || a.name.localeCompare(b.name));
+    if (!list.length) return '<span class="empty">No cards match these filters.</span>';
+    const full = Solo.Decks.count(cards) >= Solo.Decks.SIZE;
+    return list.map(c => {
+      const n = cards[c.id] || 0;
+      const b = `<button data-drem="${c.id}" ${n ? '' : 'disabled'} title="Remove one">−</button><span class="cnt">${n}/2</span><button data-dadd="${c.id}" ${n >= 2 || full ? 'disabled' : ''} title="Add one">+</button>`;
+      return cardHTML({ uid: null, id: c.id, faceDown: false, owner: 0 }, { buttons: b, cls: `dbcard ${n ? 'indeck' : ''} n${n}` });
+    }).join('');
+  }
+
+  function dbPanelHTML(db) {
+    const d = db.deck, total = Solo.Decks.count(d.cards), errs = Solo.Decks.validate(d);
+    const ch = Solo.DATA[d.character];
+    const ids = Object.keys(d.cards).filter(id => d.cards[id]).sort((a, b) => Solo.DATA[a].number - Solo.DATA[b].number || COLORS.indexOf(Solo.DATA[a].color) - COLORS.indexOf(Solo.DATA[b].color));
+    const byColor = COLORS.map(c => [c, ids.filter(id => Solo.DATA[id].color === c).reduce((t, id) => t + d.cards[id], 0)]).filter(x => x[1]);
+    const curve = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => ids.filter(id => Solo.DATA[id].number === n).reduce((t, id) => t + d.cards[id], 0));
+    const maxC = Math.max(1, ...curve);
+    const saved = loadDecks();
+    return `
+      <div class="row"><input id="dbname" value="${esc(d.name)}" maxlength="40" style="flex:1;font-weight:700"></div>
+      <div class="row"><select id="dbchar" style="flex:1">${charOptions(d.character)}</select></div>
+      ${ch ? `<div class="muted small" style="margin-bottom:8px">${esc(ch.reading)}</div>` : ''}
+      <div class="dbcount ${total === 40 ? 'ok' : ''}"><b>${total}</b> / 40 cards<div class="meter"><i style="width:${Math.min(100, total / 40 * 100)}%"></i></div></div>
+      ${byColor.length ? `<div class="colorbar">${byColor.map(([c, n]) => `<i style="flex:${n};background:${COLOR_VAR[c]}" title="${c}: ${n}"></i>`).join('')}</div>` : ''}
+      <div class="curve" title="Cards by number">${curve.map((n, i) => `<div><i style="height:${n / maxC * 100}%"></i><span>${i + 1}</span><b>${n || ''}</b></div>`).join('')}</div>
+      <div class="dblist">${ids.map(id => { const c = Solo.DATA[id]; return `<div class="dbrow" data-cid="${id}"><span class="dot" style="background:${COLOR_VAR[c.color]}"></span>
+        <span class="nn">${c.number}</span><span class="nm2">${esc(c.name)}</span><span class="x">${d.cards[id]}×</span>
+        <button data-drem="${id}">−</button><button data-dadd="${id}" ${d.cards[id] >= 2 || total >= 40 ? 'disabled' : ''}>+</button></div>`; }).join('') || '<div class="empty">Click cards on the left to add them.</div>'}</div>
+      ${errs.length ? `<div class="dberr">${errs.map(esc).join('<br>')}</div>` : '<div class="dbok">✓ Ready to play</div>'}
+      ${db.msg ? `<div class="dbmsg">${esc(db.msg)}</div>` : ''}
+      <div class="row"><button class="primary" data-dbsave>${d.id ? 'Save' : 'Save deck'}</button><button data-dbnew>New</button>
+        ${d.id ? '<button data-dbcopy>Duplicate</button><button class="danger" data-dbdel>Delete</button>' : ''}</div>
+      <div class="row"><button data-dbshare ${total ? '' : 'disabled'}>Copy share code</button></div>
+      <div class="row"><input id="dbimport" placeholder="Paste a deck code (S1-…)" style="flex:1"><button data-dbimport>Import</button></div>
+      <h2 style="margin-top:12px">Saved decks (${saved.length})</h2>
+      <div class="dbsaved">${saved.map(s => `<button class="${s.id === d.id ? 'on' : ''}" data-dbopen="${s.id}">${esc(s.name)} <span class="muted small">${Solo.DATA[s.character] ? esc(Solo.DATA[s.character].name) : ''} · ${Solo.Decks.count(s.cards)}/40${deckLegal(s) ? '' : ' · not finished'}</span></button>`).join('') || '<span class="muted small">None yet.</span>'}</div>`;
+  }
+
+  function dbClick(t, ev) {
+    const db = dbState(), d = db.deck, ds = t.dataset;
+    const change = fn => { fn(); db.dirty = true; db.msg = ''; dbRefresh(); };
+    if (ds.dadd) return change(() => { if ((d.cards[ds.dadd] || 0) < 2 && Solo.Decks.count(d.cards) < 40) d.cards[ds.dadd] = (d.cards[ds.dadd] || 0) + 1; });
+    if (ds.drem) return change(() => { d.cards[ds.drem] = Math.max(0, (d.cards[ds.drem] || 0) - 1); if (!d.cards[ds.drem]) delete d.cards[ds.drem]; });
+    if (t.classList.contains('dbcard') && ds.cid && ev.target.closest('button') === null)
+      return change(() => { if ((d.cards[ds.cid] || 0) < 2 && Solo.Decks.count(d.cards) < 40) d.cards[ds.cid] = (d.cards[ds.cid] || 0) + 1; });
+    if (ds.dbf) {
+      const key = ds.dbf === 'color' ? 'colors' : 'nums', v = ds.dbf === 'color' ? ds.v : +ds.v;
+      db.f[key] = db.f[key].includes(v) ? db.f[key].filter(x => x !== v) : db.f[key].concat([v]);
+      document.getElementById('dbfilters').innerHTML = dbFiltersHTML(db);
+      return dbRefresh();
+    }
+    if (ds.dbclear !== undefined) { db.f = { colors: [], nums: [], family: '', text: '', inDeck: false }; document.getElementById('dbfilters').innerHTML = dbFiltersHTML(db); return dbRefresh(); }
+    if (ds.dbsave !== undefined) {
+      const list = loadDecks();
+      if (!d.id) d.id = 'd' + Date.now().toString(36);
+      const rec = { id: d.id, name: d.name.trim() || 'Unnamed deck', character: d.character, cards: Object.assign({}, d.cards), updated: Date.now() };
+      const i = list.findIndex(x => x.id === d.id);
+      if (i >= 0) list[i] = rec; else list.push(rec);
+      saveDecks(list);
+      db.dirty = false;
+      const errs = Solo.Decks.validate(rec);
+      db.msg = errs.length ? 'Saved as a draft. It can be used once it\'s legal.' : 'Saved. Pick it under "Deck" in the Hotseat or Online tab.';
+      return dbRefresh();
+    }
+    const guard = () => !db.dirty || confirm('Discard your unsaved changes to this deck?');
+    if (ds.dbnew !== undefined) { if (guard()) { db.deck = newDeck(); db.dirty = false; db.msg = ''; dbRefresh(); } return; }
+    if (ds.dbopen) {
+      if (!guard()) return;
+      const s = loadDecks().find(x => x.id === ds.dbopen);
+      if (s) { db.deck = JSON.parse(JSON.stringify(s)); db.dirty = false; db.msg = ''; dbRefresh(); }
+      return;
+    }
+    if (ds.dbcopy !== undefined) { db.deck = Object.assign(JSON.parse(JSON.stringify(d)), { id: null, name: d.name + ' (copy)' }); db.dirty = true; db.msg = 'Copy made. Save it to keep it.'; return dbRefresh(); }
+    if (ds.dbdel !== undefined) {
+      if (!confirm(`Delete the deck "${d.name}"?`)) return;
+      saveDecks(loadDecks().filter(x => x.id !== d.id));
+      db.deck = newDeck(); db.dirty = false; db.msg = 'Deck deleted.';
+      return dbRefresh();
+    }
+    if (ds.dbshare !== undefined) {
+      const code = Solo.Decks.encode(d);
+      const done = () => { db.msg = 'Share code copied: ' + code; dbRefresh(); };
+      if (navigator.clipboard) navigator.clipboard.writeText(code).then(done, () => { prompt('Deck code:', code); });
+      else prompt('Deck code:', code);
+      return;
+    }
+    if (ds.dbimport !== undefined) {
+      const r = Solo.Decks.decode(document.getElementById('dbimport').value);
+      if (!r.ok) { db.msg = r.error; return dbRefresh(); }
+      if (!guard()) return;
+      db.deck = Object.assign({ id: null }, r.deck); db.dirty = true;
+      db.msg = `Imported "${r.deck.name}". Save it to keep it.`;
+      return dbRefresh();
+    }
+  }
+  function dbInput(t) {
+    const db = dbState();
+    if (t.id === 'dbtext') { db.f.text = t.value; dbRefresh(); }
+    else if (t.id === 'dbname') { db.deck.name = t.value; db.dirty = true; }
+  }
+  function dbChange(t) {
+    const db = dbState();
+    if (t.id === 'dbfamily') { db.f.family = t.value; dbRefresh(); }
+    else if (t.id === 'dbindeck') { db.f.inDeck = t.checked; dbRefresh(); }
+    else if (t.id === 'dbchar') { db.deck.character = t.value; db.dirty = true; db.msg = ''; dbRefresh(); }
   }
 
   function resetScreen() {
@@ -603,8 +793,10 @@
   }
 
   ui.dbgKeep = {};
+  app.addEventListener('input', ev => { if (!ui.mode && ui.setupTab === 'decks') dbInput(ev.target); });
   app.addEventListener('change', ev => {
     const e = ev.target;
+    if (!ui.mode && ui.setupTab === 'decks') { dbChange(e); return; }
     if (e.id && e.id.startsWith('dbg') && e.id !== 'dbgReveal') ui.dbgKeep[e.id] = e.type === 'checkbox' ? e.checked : e.value;
   });
 
@@ -627,7 +819,11 @@
 
   app.addEventListener('click', ev => {
     const t = ev.target.closest('button, input[type=checkbox], .card[data-uid], .who[data-cid], .overlay');
-    if (!t || !ui.mode) return;
+    if (!ui.mode) {
+      if (ui.setupTab === 'decks') { const b = ev.target.closest('button, .card[data-cid]'); if (b) dbClick(b, ev); }
+      return;
+    }
+    if (!t) return;
     if (t.dataset.leave !== undefined) {
       const over = !current() || current().phase === 'over';
       const msg = ui.mode === 'host' && !over ? 'Leave this game? Your friend will be disconnected. (You can resume it later from the Online tab.)' : 'Leave this game?';

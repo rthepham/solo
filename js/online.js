@@ -8,7 +8,7 @@
 // state and the pending choice's saved base state are all removed.
 //
 // Messages (JSON):
-//   guest -> host  { t:'hello', version, token, character, style }
+//   guest -> host  { t:'hello', version, token, character, style | deck }   deck: 40 card ids from the deck builder
 //                  { t:'action', action }      a move or a choice, as player 1
 //                  { t:'ping' }
 //   host -> guest  { t:'welcome', version, seat }
@@ -76,20 +76,26 @@
   // (the seed would let them recompute both decks).
   Online.newSeed = () => 'online-' + randomString(20, 'abcdefghijklmnopqrstuvwxyz0123456789');
 
+  // Each player brings a built deck (40 card ids) or a random one (style).
   // Decks are shuffled again with the secret seed before cards get their ids,
   // so a card's uid says nothing about which card it is (buildDeck lists the
-  // two copies of each card 20 places apart).
+  // two copies of each card 20 places apart, and built decks are sorted).
   function buildConfig(seed, choices) {
     return { seed, players: choices.map((ch, p) => {
-      const deck = Solo.buildDeck(seed + '#' + p, ch.character, ch.style);
+      const deck = ch.deck ? ch.deck.slice() : Solo.buildDeck(seed + '#' + p, ch.character, ch.style);
       Solo.RNG.shuffle({ rng: Solo.RNG.seedToInt(seed + '|order|' + p) }, deck);
       return { character: ch.character, deck };
     }) };
   }
   Online.buildConfig = buildConfig;
 
-  const validChoice = c => c && Solo.DATA[c.character] && Solo.DATA[c.character].kind === 'character' &&
-    Solo.EFFECTS[c.character] && (c.style === 'mono' || c.style === 'mixed');
+  // Problems with a player's deck choice (empty = fine). Built decks are checked against the deck rules.
+  function choiceErrors(c) {
+    if (!c || !Solo.DATA[c.character] || Solo.DATA[c.character].kind !== 'character' || !Solo.EFFECTS[c.character]) return ['Pick a character.'];
+    if (c.deck !== undefined && c.deck !== null) return Solo.Decks.validateList(c.character, c.deck);
+    return c.style === 'mono' || c.style === 'mixed' ? [] : ['Pick a deck.'];
+  }
+  Online.choiceErrors = choiceErrors;
 
   // ------------------------------------------------------------------ host
   // opts: { host: {character, style}, seed?, onChange(), save(record) }
@@ -161,7 +167,10 @@
     if (typeof msg.token !== 'string' || !msg.token) return reject('bad', 'Missing player token.');
     if (this.guestToken && msg.token !== this.guestToken && this.conn)
       return reject('full', 'This room already has two players.');
-    if (!this.state && !validChoice(msg)) return reject('bad', 'Pick a character and deck style.');
+    if (!this.state) {
+      const errs = choiceErrors(msg);
+      if (errs.length) return reject('deck', 'The host refused your deck: ' + errs.join(' '));
+    }
     if (this.conn && this.conn !== conn) this.conn.close();   // same player rejoining from a new connection
     this.conn = conn;
     this.guestToken = msg.token;
@@ -169,7 +178,8 @@
     this.status = 'connected';
     conn.send({ t: 'welcome', version: Solo.VERSION, seat: GUEST });
     if (!this.state) {
-      this.config = buildConfig(this.seed, [this.host, { character: msg.character, style: msg.style }]);
+      const guestChoice = msg.deck ? { character: msg.character, deck: msg.deck.slice() } : { character: msg.character, style: msg.style };
+      this.config = buildConfig(this.seed, [this.host, guestChoice]);
       this.state = Solo.newGame(this.config);
       this.apply({ type: 'start' });
       return;
@@ -221,7 +231,7 @@
 
   GuestSession.prototype.attach = function (conn) {
     this.conn = conn;
-    conn.send({ t: 'hello', version: Solo.VERSION, token: this.token, character: this.opts.character, style: this.opts.style });
+    conn.send({ t: 'hello', version: Solo.VERSION, token: this.token, character: this.opts.character, style: this.opts.style, deck: this.opts.deck || null });
   };
   GuestSession.prototype.detach = function () {
     this.conn = null;
