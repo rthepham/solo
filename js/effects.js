@@ -216,7 +216,7 @@
     H.gainEnergy(s, p, downs.length);
   } };
   E['U9-check'] = { onEnter(s, c, p) {
-    if (!nextTo(s, c, 0, 'flip up to 4 cards')) return;
+    if (!nextTo(s, c, 0, 'flip a card 4 times (either combo)')) return;
     for (let i = 1; i <= 4; i++) {
       const cands = faceUp(P(s, p).combo.concat(P(s, opp(p)).combo));
       const t = H.chooseCard(s, p, `Check Finisher: flip a card (${i} of 4)`, cands);
